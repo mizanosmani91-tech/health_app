@@ -1,0 +1,163 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  patient
+  owner
+}
+
+enum PharmacyStatus {
+  pending
+  verified
+  rejected
+}
+
+enum StockStatus {
+  in
+  low
+  out
+}
+
+enum RequestStatus {
+  new
+  replied
+}
+
+enum Availability {
+  pending
+  yes
+  no
+}
+
+enum LedgerKind {
+  income
+  expense
+}
+
+enum KhataDirection {
+  receivable
+  payable
+}
+
+model User {
+  id         String   @id @default(uuid())
+  googleSub  String   @unique
+  email      String?
+  name       String?
+  role       Role?
+  createdAt  DateTime @default(now())
+  pharmacy   Pharmacy?
+  requests   MedRequest[]
+}
+
+model Pharmacy {
+  id         String         @id @default(uuid())
+  ownerId    String         @unique
+  owner      User           @relation(fields: [ownerId], references: [id])
+  name       String
+  address    String
+  phone      String
+  licenseNo  String
+  status     PharmacyStatus @default(pending)
+  isOpen     Boolean        @default(true)
+  openFrom   String         @default("09:00")
+  openTo     String         @default("22:00")
+  weeklyOff  String?
+  notifyNew  Boolean        @default(true)
+  createdAt  DateTime       @default(now())
+  license    LicensePhoto?
+  stock      StockItem[]
+  requests   MedRequest[]
+  ledger     LedgerEntry[]
+  khata      KhataEntry[]
+
+  @@index([status])
+}
+
+// Drug-licence photo (<= 700 KB), only ever read through the admin route.
+model LicensePhoto {
+  pharmacyId String   @id
+  pharmacy   Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  image      Bytes
+  createdAt  DateTime @default(now())
+}
+
+model StockItem {
+  id          String      @id @default(uuid())
+  pharmacyId  String
+  pharmacy    Pharmacy    @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  name        String
+  genericName String?
+  form        String?
+  qty         Decimal?    @db.Decimal(12, 2)
+  unit        String?
+  buyPrice    Decimal?    @db.Decimal(12, 2)
+  sellPrice   Decimal?    @db.Decimal(12, 2)
+  expiry      String?     // YYYY-MM-DD
+  batchNo     String?
+  status      StockStatus @default(in)
+  updatedAt   DateTime    @updatedAt
+
+  @@index([pharmacyId])
+}
+
+model MedRequest {
+  id           String        @id @default(uuid())
+  pharmacyId   String
+  pharmacy     Pharmacy      @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  patientId    String
+  patient      User          @relation(fields: [patientId], references: [id])
+  patientName  String
+  status       RequestStatus @default(new)
+  replyMessage String?
+  repliedAt    DateTime?
+  createdAt    DateTime      @default(now())
+  items        RequestItem[]
+
+  @@index([pharmacyId, createdAt])
+  @@index([patientId, createdAt])
+}
+
+model RequestItem {
+  requestId    String
+  request      MedRequest   @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  idx          Int
+  name         String
+  days         Int          @default(0)
+  availability Availability @default(pending)
+
+  @@id([requestId, idx])
+}
+
+model LedgerEntry {
+  id         String     @id @default(uuid())
+  pharmacyId String
+  pharmacy   Pharmacy   @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  kind       LedgerKind
+  title      String
+  amount     Decimal    @db.Decimal(12, 2)
+  entryDate  String     // YYYY-MM-DD
+  createdAt  DateTime   @default(now())
+
+  @@index([pharmacyId, entryDate])
+}
+
+model KhataEntry {
+  id         String         @id @default(uuid())
+  pharmacyId String
+  pharmacy   Pharmacy       @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  direction  KhataDirection
+  partyName  String
+  phone      String?
+  amount     Decimal        @db.Decimal(12, 2)
+  paid       Decimal        @default(0) @db.Decimal(12, 2)
+  createdAt  DateTime       @default(now())
+
+  @@index([pharmacyId, direction])
+}

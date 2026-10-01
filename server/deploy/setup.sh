@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Installs the Health Diary API on a fresh Ubuntu VPS: Node, the app (systemd), Caddy (automatic HTTPS), daily backups.
-# Safe to re-run (it updates the code and keeps your existing secrets/data).
+# Installs the Health Diary API on an Ubuntu VPS: Node 22, PostgreSQL, the app (systemd), Caddy (automatic HTTPS),
+# and daily database backups. Safe to re-run (updates code, runs new migrations, keeps secrets and data).
 #
-#   git clone <repo> && cd health_app
+#   git clone https://github.com/mizanosmani91-tech/health_app && cd health_app
+#   git checkout claude/family-health-tracker-oa9nmf
 #   sudo bash server/deploy/setup.sh <domain> <google-web-client-id> [--firewall]
 #
-# <domain>  e.g. vps-2976817d.vps.ovh.ca  (must already point at this server; port 80/443 reachable)
+# <domain>  e.g. vps-2976817d.vps.ovh.ca (must resolve to this server; ports 80/443 reachable)
 set -euo pipefail
 
 DOMAIN="${1:-}"; CLIENT_ID="${2:-}"; FIREWALL="${3:-}"
@@ -14,17 +15,17 @@ DOMAIN="${1:-}"; CLIENT_ID="${2:-}"; FIREWALL="${3:-}"
 
 SRC="$(cd "$(dirname "$0")/.." && pwd)"
 APP=/opt/health-diary
-DATA=/var/lib/health-diary
+BACKUPS=/var/backups/health-diary
 ENVF=/etc/health-diary.env
 export DEBIAN_FRONTEND=noninteractive
 
 echo "==> packages"
 apt-get update -y
-apt-get install -y curl ca-certificates gnupg debian-keyring debian-archive-keyring apt-transport-https sqlite3 rsync openssl
+apt-get install -y curl ca-certificates gnupg debian-keyring debian-archive-keyring apt-transport-https rsync openssl postgresql postgresql-client
 
 need_node=1
 if command -v node >/dev/null; then
-  node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>22||(a==22&&b>=13)?0:1)' && need_node=0 || true
+  node -e 'process.exit(Number(process.versions.node.split(".")[0])>=20?0:1)' && need_node=0 || true
 fi
 if [[ $need_node -eq 1 ]]; then
   echo "==> installing Node 22"
@@ -40,56 +41,59 @@ if ! command -v caddy >/dev/null; then
   apt-get install -y caddy
 fi
 
-echo "==> app user, code, data"
-id -u hd >/dev/null 2>&1 || useradd --system --home "$APP" --shell /usr/sbin/nologin hd
-mkdir -p "$APP" "$DATA/backups"
-rsync -a --delete --exclude node_modules --exclude data --exclude test "$SRC/" "$APP/"
-(cd "$APP" && npm ci --omit=dev --no-audit --no-fund)
-chown -R root:root "$APP"
-chown -R hd:hd "$DATA"
-chmod 700 "$DATA"
-
 echo "==> config ($ENVF)"
 if [[ ! -f "$ENVF" ]]; then
+  DBPASS="$(openssl rand -hex 24)"
   umask 077
   cat > "$ENVF" <<ENV
 PORT=8787
-DATA_DIR=$DATA
+DATABASE_URL=postgresql://healthdiary:${DBPASS}@127.0.0.1:5432/healthdiary?schema=public
 JWT_SECRET=$(openssl rand -hex 32)
 ADMIN_KEY=$(openssl rand -hex 24)
 GOOGLE_CLIENT_IDS=$CLIENT_ID
 ENV
+  su postgres -c "psql -v ON_ERROR_STOP=1 -c \"CREATE ROLE healthdiary LOGIN PASSWORD '${DBPASS}'\"" || true
+  su postgres -c "psql -v ON_ERROR_STOP=1 -c \"CREATE DATABASE healthdiary OWNER healthdiary\"" || true
 else
-  # keep secrets, but let the client id be updated on re-run
   sed -i "s|^GOOGLE_CLIENT_IDS=.*|GOOGLE_CLIENT_IDS=$CLIENT_ID|" "$ENVF"
 fi
+id -u hd >/dev/null 2>&1 || useradd --system --home "$APP" --shell /usr/sbin/nologin hd
 chown root:hd "$ENVF"; chmod 640 "$ENVF"
+
+echo "==> app code, build, migrations"
+mkdir -p "$APP"
+rsync -a --delete --exclude node_modules --exclude dist --exclude test "$SRC/" "$APP/"
+cd "$APP"
+npm ci --no-audit --no-fund            # installs dev deps too (needed for tsc/prisma); postinstall runs prisma generate
+npm run build
+set -a; source "$ENVF"; set +a
+npx prisma migrate deploy
+chown -R root:root "$APP"
 
 echo "==> systemd service"
 cat > /etc/systemd/system/health-diary.service <<UNIT
 [Unit]
 Description=Health Diary API
-After=network.target
+After=network.target postgresql.service
 
 [Service]
 User=hd
 Group=hd
 WorkingDirectory=$APP
 EnvironmentFile=$ENVF
-ExecStart=/usr/bin/node --no-warnings src/server.js
+ExecStart=/usr/bin/node dist/server.js
 Restart=always
 RestartSec=3
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=$DATA
 
 [Install]
 WantedBy=multi-user.target
 UNIT
 systemctl daemon-reload
-systemctl enable --now health-diary
+systemctl enable health-diary
 systemctl restart health-diary
 
 echo "==> Caddy (HTTPS for $DOMAIN)"
@@ -103,17 +107,17 @@ touch /etc/caddy/Caddyfile
 grep -qF "import /etc/caddy/health-diary.caddy" /etc/caddy/Caddyfile || echo "import /etc/caddy/health-diary.caddy" >> /etc/caddy/Caddyfile
 systemctl reload caddy || systemctl restart caddy
 
-echo "==> daily backup (03:30, keeps 14 days) -> $DATA/backups"
+echo "==> daily backup (03:30, keeps 14 days) -> $BACKUPS"
+mkdir -p "$BACKUPS"; chown postgres:postgres "$BACKUPS"; chmod 700 "$BACKUPS"
 cat > /usr/local/bin/hd-backup <<'BAK'
 #!/usr/bin/env bash
 set -euo pipefail
-D=/var/lib/health-diary; T=$(date +%F)
-sqlite3 "$D/app.db" ".backup '$D/backups/app-$T.db'"
-tar -C "$D" -czf "$D/backups/licenses-$T.tgz" licenses 2>/dev/null || true
-find "$D/backups" -type f -mtime +14 -delete
+D=/var/backups/health-diary
+pg_dump -Fc healthdiary > "$D/healthdiary-$(date +%F).dump"
+find "$D" -type f -mtime +14 -delete
 BAK
 chmod +x /usr/local/bin/hd-backup
-echo "30 3 * * * hd /usr/local/bin/hd-backup" > /etc/cron.d/health-diary-backup
+echo "30 3 * * * postgres /usr/local/bin/hd-backup" > /etc/cron.d/health-diary-backup
 
 if [[ "$FIREWALL" == "--firewall" ]]; then
   echo "==> firewall: allow SSH(22), 80, 443 only"
@@ -122,11 +126,11 @@ if [[ "$FIREWALL" == "--firewall" ]]; then
   ufw --force enable
 fi
 
-sleep 2
+sleep 3
 echo
 systemctl is-active health-diary && echo "API service: running"
 echo "Local check : $(curl -fsS http://127.0.0.1:8787/health || echo FAILED)"
-echo "Public check: curl https://$DOMAIN/health   (HTTPS certificate can take ~30s the first time)"
+echo "Public check: curl https://$DOMAIN/health   (the HTTPS certificate can take ~30s the first time)"
 echo
 echo "Admin key (to verify pharmacies):  sudo grep ADMIN_KEY $ENVF"
-echo "IMPORTANT: copy $DATA/backups off this server regularly (e.g. rsync/scp to your PC)."
+echo "Backups: $BACKUPS  — copy them OFF this server regularly (scp/rsync to your PC)."
