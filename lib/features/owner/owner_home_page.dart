@@ -15,14 +15,14 @@ class OwnerHomePage extends StatelessWidget {
     final o = context.watch<OwnerCtx>();
     final ph = o.pharmacy!;
     return Q<List<Map<String, dynamic>>>(
-      load: () => o.rows(o.db.from('med_requests').select('id,patient_id,patient_name,status,created_at,med_request_items(id)')
-          .eq('pharmacy_id', o.pid).order('created_at', ascending: false).limit(200)),
+      load: () async => ((await o.db.collection('requests').where('pharmacyId', isEqualTo: o.pid).get()).docs.map(withId).toList()
+        ..sort((a, b) => (ts(b['createdAt']) ?? DateTime.now()).compareTo(ts(a['createdAt']) ?? DateTime.now()))),
       builder: (c, reqs) {
         final today = dateOnly(DateTime.now());
         final fresh = reqs.where((r) => r['status'] == 'new').toList();
-        final todays = reqs.where((r) => !dateOnly(DateTime.parse(r['created_at']).toLocal()).isBefore(today)).length;
+        final todays = reqs.where((r) => !dateOnly((ts(r['createdAt']) ?? DateTime.now())).isBefore(today)).length;
         final replied = reqs.where((r) => r['status'] == 'replied').length;
-        final regulars = reqs.map((r) => r['patient_id']).toSet().length;
+        final regulars = reqs.map((r) => r['patientId']).toSet().length;
         Widget stat(String n, String l, Tint t) => Expanded(
               child: Container(
                 margin: const EdgeInsets.all(6), padding: const EdgeInsets.all(14),
@@ -43,14 +43,13 @@ class OwnerHomePage extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(16)),
                 child: Row(children: [
-                  Icon(Icons.circle, size: 12, color: ph['is_open'] == true ? const Color(0xFF7CF0A8) : Colors.white54),
+                  Icon(Icons.circle, size: 12, color: ph['isOpen'] == true ? const Color(0xFF7CF0A8) : Colors.white54),
                   const SizedBox(width: 10),
-                  Expanded(child: Text(ph['is_open'] == true ? 'এখন খোলা' : 'এখন বন্ধ', style: const TextStyle(fontWeight: FontWeight.w500))),
+                  Expanded(child: Text(ph['isOpen'] == true ? 'এখন খোলা' : 'এখন বন্ধ', style: const TextStyle(fontWeight: FontWeight.w500))),
                   Switch(
-                    value: ph['is_open'] == true, activeThumbColor: Colors.white, activeTrackColor: waGreen,
+                    value: ph['isOpen'] == true, activeThumbColor: Colors.white, activeTrackColor: waGreen,
                     onChanged: (v) async {
-                      await o.db.from('pharmacies').update({'is_open': v}).eq('id', o.pid);
-                      await o.load();
+                      await o.updatePharmacy({'isOpen': v});
                     },
                   ),
                 ]),
@@ -84,11 +83,11 @@ class OwnerHomePage extends StatelessWidget {
                       margin: const EdgeInsets.only(bottom: 10),
                       onTap: () => context.push(RequestDetailPage(id: r['id'])),
                       child: Row(children: [
-                        IconTile(Icons.person, Tint.all[(r['patient_name'] as String).hashCode.abs() % 6], round: true),
+                        IconTile(Icons.person, Tint.all[(r['patientName'] as String).hashCode.abs() % 6], round: true),
                         const SizedBox(width: 12),
                         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(r['patient_name'], style: const TextStyle(fontWeight: FontWeight.w600)),
-                          Muted('${bn((r['med_request_items'] as List).length)}টি ওষুধ · ${relativeTime(r['created_at'])}'),
+                          Text(r['patientName'], style: const TextStyle(fontWeight: FontWeight.w600)),
+                          Muted('${bn((r['items'] as List).length)}টি ওষুধ · ${relativeTime(ts(r['createdAt']))}'),
                         ])),
                         const Pill.no('নতুন'),
                       ]),

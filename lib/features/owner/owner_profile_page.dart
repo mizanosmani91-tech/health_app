@@ -20,16 +20,14 @@ class OwnerProfilePage extends StatelessWidget {
       ),
     );
     if (v == null || v.isEmpty) return;
-    await o.db.from('pharmacies').update({col: v}).eq('id', o.pid);
-    await o.load();
+    await o.updatePharmacy({col: v});
   }
 
   Future<void> _time(BuildContext context, OwnerCtx o, String col, String label) async {
     final cur = '${o.pharmacy![col]}'.split(':');
     final t = await showTimePicker(context: context, initialTime: TimeOfDay(hour: int.parse(cur[0]), minute: int.parse(cur[1])), helpText: label);
     if (t == null) return;
-    await o.db.from('pharmacies').update({col: '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:00'}).eq('id', o.pid);
-    await o.load();
+    await o.updatePharmacy({col: '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}'});
   }
 
   @override
@@ -79,18 +77,18 @@ class OwnerProfilePage extends StatelessWidget {
           Card2(padding: EdgeInsets.zero, margin: const EdgeInsets.only(bottom: 12), child: Column(children: [
             row(Icons.location_on, Tint.purple, p['address'], onTap: () => _edit(context, o, 'address', 'ঠিকানা')),
             row(Icons.call, Tint.green, p['phone'], onTap: () => _edit(context, o, 'phone', 'মোবাইল নম্বর')),
-            row(Icons.schedule, Tint.blue, 'খোলা: ${hm(p['open_from'])} — ${hm(p['open_to'])}', onTap: () async {
-              await _time(context, o, 'open_from', 'খোলার সময়');
-              if (context.mounted) await _time(context, o, 'open_to', 'বন্ধের সময়');
+            row(Icons.schedule, Tint.blue, 'খোলা: ${hm(p['openFrom'])} — ${hm(p['openTo'])}', onTap: () async {
+              await _time(context, o, 'openFrom', 'খোলার সময়');
+              if (context.mounted) await _time(context, o, 'openTo', 'বন্ধের সময়');
             }),
-            row(Icons.event_busy, Tint.amber, 'সাপ্তাহিক ছুটি', sub: p['weekly_off'] ?? 'নেই', onTap: () => _edit(context, o, 'weekly_off', 'সাপ্তাহিক ছুটি (যেমন: শুক্রবার দুপুর)')),
+            row(Icons.event_busy, Tint.amber, 'সাপ্তাহিক ছুটি', sub: p['weeklyOff'] ?? 'নেই', onTap: () => _edit(context, o, 'weeklyOff', 'সাপ্তাহিক ছুটি (যেমন: শুক্রবার দুপুর)')),
           ])),
           Card2(padding: EdgeInsets.zero, margin: const EdgeInsets.only(bottom: 12), child: Column(children: [
             row(Icons.notifications, Tint.purple, 'নতুন অনুরোধের নোটিফিকেশন', trailing: Switch(
-              value: p['notify_new'] == true,
-              onChanged: (v) async { await o.db.from('pharmacies').update({'notify_new': v}).eq('id', o.pid); await o.load(); },
+              value: p['notifyNew'] == true,
+              onChanged: (v) => o.updatePharmacy({'notifyNew': v}),
             )),
-            row(Icons.badge, Tint.green, 'লাইসেন্স ${p['license_no']}', sub: st == 'verified' ? 'যাচাই সম্পন্ন' : 'যাচাই চলছে'),
+            row(Icons.badge, Tint.green, 'লাইসেন্স ${p['licenseNo']}', sub: st == 'verified' ? 'যাচাই সম্পন্ন' : 'যাচাই চলছে'),
           ])),
           Card2(
             color: const Color(0xFFFFE9E0),

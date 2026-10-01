@@ -53,12 +53,12 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 6),
             const Muted('Google দিয়ে এক ট্যাপে ঢুকুন। ওটিপি লাগবে না।', size: 15),
             const SizedBox(height: 22),
-            OutlineButton2Big(busy: _busy, onTap: Config.hasSupabase ? _google : null),
-            if (!Config.hasSupabase) ...[
+            OutlineButton2Big(busy: _busy, onTap: Config.hasBackend ? _google : null),
+            if (!Config.hasBackend) ...[
               const SizedBox(height: 14),
               Card2(
                 color: const Color(0xFFFFF0D1),
-                child: const Text('Supabase কনফিগার করা নেই (SUPABASE_URL, SUPABASE_ANON_KEY)। '
+                child: const Text('Firebase কনফিগার করা নেই (FIREBASE_* ভ্যারিয়েবল)। '
                     'চাইলে নিচের বোতামে অফলাইন মোডে শুধু রোগী/পরিবারের অংশ চালিয়ে দেখতে পারেন।',
                     style: TextStyle(color: Color(0xFF6B4305), height: 1.5)),
               ),

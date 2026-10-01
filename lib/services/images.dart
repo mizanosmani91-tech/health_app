@@ -14,9 +14,9 @@ Future<String> persistImage(XFile f) async {
 
 final _picker = ImagePicker();
 
-Future<String?> pickImage({required bool camera}) async {
+Future<String?> pickImage({required bool camera, double maxWidth = 2000, int quality = 85}) async {
   final x = await _picker.pickImage(
-      source: camera ? ImageSource.camera : ImageSource.gallery, maxWidth: 2000, imageQuality: 85);
+      source: camera ? ImageSource.camera : ImageSource.gallery, maxWidth: maxWidth, imageQuality: quality);
   return x == null ? null : persistImage(x);
 }
 

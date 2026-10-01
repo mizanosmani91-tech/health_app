@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -188,11 +189,37 @@ class _PharmacyPageState extends State<PharmacyPage> {
     );
   }
 
+  /// Verified pharmacies, each with one public stock doc (name + in/low/out only).
   Future<List<Map<String, dynamic>>> _doSearch(List<String> names) async {
-    if (!Config.hasSupabase) return [];
-    final r = await AuthService.instance.client.rpc('search_stock', params: {'p_names': names});
-    return (r as List).cast<Map<String, dynamic>>();
+    if (!Config.hasBackend) return [];
+    final db = AuthService.instance.db;
+    final phs = (await db.collection('pharmacies').where('status', isEqualTo: 'verified').limit(50).get()).docs;
+    final stocks = await Future.wait(phs.map((p) => db.collection('stockPublic').doc(p.id).get()));
+    const rank = {'in': 3, 'low': 2, 'out': 1};
+    final out = <Map<String, dynamic>>[];
+    for (final (i, p) in phs.indexed) {
+      final d = p.data();
+      final sd = stocks[i].data();
+      final items = ((sd?['items'] as Map?)?.values ?? const []).cast<Map>();
+      for (final n in names) {
+        final q = n.toLowerCase();
+        var best = 'unknown';
+        for (final it in items) {
+          if (!('${it['n']} ${it['g'] ?? ''}'.toLowerCase().contains(q))) continue;
+          final st = '${it['s']}';
+          if ((rank[st] ?? 0) > (rank[best] ?? 0)) best = st;
+        }
+        out.add({
+          'pharmacy_id': p.id, 'pharmacy_name': d['name'], 'address': d['address'], 'phone': d['phone'],
+          'is_open': d['isOpen'], 'medicine_name': n, 'status': best,
+          'updated_at': ts2(sd?['updatedAt'])?.toIso8601String(),
+        });
+      }
+    }
+    return out;
   }
+
+  DateTime? ts2(dynamic v) => v is Timestamp ? v.toDate() : null;
 
   Widget _resultList(BuildContext context, List<Map<String, dynamic>> rows, Member me) {
     final byPh = <String, List<Map<String, dynamic>>>{};
@@ -257,10 +284,12 @@ class _PharmacyPageState extends State<PharmacyPage> {
 
   Future<void> _sendRequest(BuildContext context, Map<String, dynamic> head, List<Map<String, dynamic>> list, Member me) async {
     try {
-      await AuthService.instance.client.rpc('create_med_request', params: {
-        'p_pharmacy_id': head['pharmacy_id'],
-        'p_patient_name': me.name,
-        'p_items': [for (final r in list) {'name': r['medicine_name'], 'days': 0}],
+      final a = AuthService.instance;
+      await a.db.collection('requests').add({
+        'pharmacyId': head['pharmacy_id'], 'pharmacyName': head['pharmacy_name'], 'pharmacyPhone': head['phone'],
+        'patientId': a.user!.uid, 'patientName': me.name, 'status': 'new', 'replyMessage': null,
+        'items': [for (final r in list) {'name': r['medicine_name'], 'days': 0, 'availability': 'pending'}],
+        'createdAt': FieldValue.serverTimestamp(),
       });
       if (context.mounted) context.toast('অনুরোধ পাঠানো হয়েছে');
       setState(() => _tab = 2);
@@ -271,15 +300,11 @@ class _PharmacyPageState extends State<PharmacyPage> {
 
   // ---- my requests --------------------------------------------------------
   Widget _requests(BuildContext context) {
-    final uid = AuthService.instance.user?.id;
+    final uid = AuthService.instance.user?.uid;
     return Q<List<Map<String, dynamic>>>(
-      load: () async => ((await AuthService.instance.client
-              .from('med_requests')
-              .select('id,status,reply_message,created_at,pharmacies(name,phone),med_request_items(medicine_name,availability)')
-              .eq('patient_id', uid!)
-              .order('created_at', ascending: false)
-              .limit(30)) as List)
-          .cast<Map<String, dynamic>>(),
+      load: () async => (await AuthService.instance.db.collection('requests').where('patientId', isEqualTo: uid).get())
+          .docs.map((d) => {...d.data(), 'id': d.id}).toList()
+        ..sort((a, b) => (ts2(b['createdAt']) ?? DateTime.now()).compareTo(ts2(a['createdAt']) ?? DateTime.now())),
       builder: (c, rows) {
         if (rows.isEmpty) return const Empty(Icons.inbox, 'এখনো কোনো অনুরোধ পাঠাননি।');
         return Column(children: [
@@ -288,23 +313,23 @@ class _PharmacyPageState extends State<PharmacyPage> {
               margin: const EdgeInsets.only(bottom: 10),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
-                  Expanded(child: Text(r['pharmacies']?['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600))),
+                  Expanded(child: Text(r['pharmacyName'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600))),
                   r['status'] == 'replied' ? const Pill.ok('উত্তর এসেছে') : const Pill.low('অপেক্ষায়'),
                 ]),
                 const SizedBox(height: 8),
-                for (final i in (r['med_request_items'] as List))
+                for (final i in (r['items'] as List))
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 2),
                     child: Row(children: [
-                      Expanded(child: Text(i['medicine_name'])),
+                      Expanded(child: Text(i['name'])),
                       switch (i['availability']) { 'yes' => const Pill.ok('আছে'), 'no' => const Pill.no('নেই'), _ => const Muted('—') },
                     ]),
                   ),
-                if ((r['reply_message'] ?? '').toString().isNotEmpty) ...[
+                if ((r['replyMessage'] ?? '').toString().isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Card2(color: context.pal.soft, child: Row(children: [
                     Icon(Icons.chat, size: 18, color: context.pal.primaryDark), const SizedBox(width: 8),
-                    Expanded(child: Text(r['reply_message'])),
+                    Expanded(child: Text(r['replyMessage'])),
                   ])),
                 ],
               ]),

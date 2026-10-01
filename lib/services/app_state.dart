@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../core/config.dart';
 import '../data/local_db.dart';
 import '../data/models.dart';
@@ -19,12 +19,14 @@ class AppState extends ChangeNotifier {
   final _auth = AuthService.instance;
 
   Future<void> start() async {
-    if (Config.hasSupabase) {
-      Supabase.instance.client.auth.onAuthStateChange.listen((e) {
-        if (e.event == AuthChangeEvent.signedOut) {
+    if (Config.hasBackend) {
+      var wasSignedIn = FirebaseAuth.instance.currentUser != null;
+      FirebaseAuth.instance.authStateChanges().listen((u) {
+        if (u == null && wasSignedIn) {
           role = null;
           _resolve();
         }
+        wasSignedIn = u != null;
       });
     }
     await _resolve();
@@ -35,7 +37,7 @@ class AppState extends ChangeNotifier {
     if (offline) {
       role = UserRole.patient;
     } else {
-      if (!Config.hasSupabase || _auth.user == null) return _go(Stage.login);
+      if (!Config.hasBackend || _auth.user == null) return _go(Stage.login);
       try {
         role ??= await _auth.loadRole();
       } catch (_) {
@@ -56,8 +58,8 @@ class AppState extends ChangeNotifier {
   }
 
   Future<bool> _hasPharmacy() async {
-    final r = await _auth.client.from('pharmacies').select('id').eq('owner_id', _auth.user!.id).maybeSingle();
-    return r != null;
+    // The pharmacy doc id is the owner's uid.
+    return (await _auth.db.collection('pharmacies').doc(_auth.user!.uid).get()).exists;
   }
 
   void _go(Stage s) {

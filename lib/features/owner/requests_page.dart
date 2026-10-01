@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/bn.dart';
@@ -5,8 +6,8 @@ import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import 'owner_ctx.dart';
 
-String relativeTime(String iso) {
-  final d = DateTime.parse(iso).toLocal();
+String relativeTime(DateTime? d) {
+  if (d == null) return 'এইমাত্র';
   final m = DateTime.now().difference(d).inMinutes;
   if (m < 1) return 'এইমাত্র';
   if (m < 60) return '${bn(m)} মিনিট আগে';
@@ -29,8 +30,9 @@ class _RequestsPageState extends State<RequestsPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('অনুরোধ', style: TextStyle(fontWeight: FontWeight.w600))),
       body: Q<List<Map<String, dynamic>>>(
-        load: () => o.rows(o.db.from('med_requests').select('id,patient_name,status,created_at,med_request_items(id)')
-            .eq('pharmacy_id', o.pid).eq('status', _f).order('created_at', ascending: false).limit(100)),
+        load: () async => ((await o.db.collection('requests').where('pharmacyId', isEqualTo: o.pid).get()).docs.map(withId)
+            .where((r) => r['status'] == _f).toList()
+          ..sort((a, b) => (ts(b['createdAt']) ?? DateTime.now()).compareTo(ts(a['createdAt']) ?? DateTime.now()))),
         builder: (c, rows) => ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 140), children: [
           Row(children: [
             Chip2('নতুন', selected: _f == 'new', onTap: () => setState(() => _f = 'new')),
@@ -44,11 +46,11 @@ class _RequestsPageState extends State<RequestsPage> {
               margin: const EdgeInsets.only(bottom: 10),
               onTap: () => context.push(RequestDetailPage(id: r['id'])),
               child: Row(children: [
-                IconTile(Icons.person, Tint.all[(r['patient_name'] as String).hashCode.abs() % 6], round: true),
+                IconTile(Icons.person, Tint.all[(r['patientName'] as String).hashCode.abs() % 6], round: true),
                 const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(r['patient_name'], style: const TextStyle(fontWeight: FontWeight.w600)),
-                  Muted('${bn((r['med_request_items'] as List).length)}টি ওষুধ · ${relativeTime(r['created_at'])}'),
+                  Text(r['patientName'], style: const TextStyle(fontWeight: FontWeight.w600)),
+                  Muted('${bn((r['items'] as List).length)}টি ওষুধ · ${relativeTime(ts(r['createdAt']))}'),
                 ])),
                 Icon(Icons.chevron_right, color: context.pal.muted),
               ]),
@@ -74,13 +76,10 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
   Future<void> _send(OwnerCtx o, List items) async {
     setState(() => _busy = true);
     try {
-      for (final i in items) {
-        final a = _avail[i['id']] ?? 'pending';
-        if (a != i['availability']) await o.db.from('med_request_items').update({'availability': a}).eq('id', i['id']);
-      }
-      await o.db.from('med_requests').update({
-        'status': 'replied', 'reply_message': _msg.text.trim(), 'replied_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('id', widget.id);
+      await o.db.collection('requests').doc(widget.id).update({
+        'items': [for (final (i, it) in items.indexed) {...(it as Map<String, dynamic>), 'availability': _avail['$i'] ?? 'pending'}],
+        'status': 'replied', 'replyMessage': _msg.text.trim(), 'repliedAt': FieldValue.serverTimestamp(),
+      });
       if (!mounted) return;
       o.touch();
       Navigator.pop(context);
@@ -106,15 +105,15 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('অনুরোধ', style: TextStyle(fontWeight: FontWeight.w600))),
       body: FutureBuilder<Map<String, dynamic>>(
-        future: o.db.from('med_requests').select('id,patient_name,status,reply_message,created_at,med_request_items(id,medicine_name,days,availability)').eq('id', widget.id).single(),
+        future: o.db.collection('requests').doc(widget.id).get().then(withId),
         builder: (c, s) {
           if (!s.hasData) return const Center(child: CircularProgressIndicator());
           final r = s.data!;
-          final items = (r['med_request_items'] as List).cast<Map<String, dynamic>>();
+          final items = (r['items'] as List).cast<Map<String, dynamic>>();
           if (!_init) {
             _init = true;
-            for (final i in items) { _avail[i['id']] = i['availability']; }
-            _msg.text = r['reply_message'] ?? '';
+            for (final (k, i) in items.indexed) { _avail['$k'] = i['availability']; }
+            _msg.text = r['replyMessage'] ?? '';
           }
           return Column(children: [
             Expanded(
@@ -122,26 +121,26 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
                 Card2(child: Row(children: [
                   IconTile(Icons.person, Tint.orange, size: 48, round: true), const SizedBox(width: 12),
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(r['patient_name'], style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                    Muted('${relativeTime(r['created_at'])} পাঠিয়েছেন'),
+                    Text(r['patientName'], style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                    Muted('${relativeTime(ts(r['createdAt']))} পাঠিয়েছেন'),
                   ]),
                 ])),
                 const SectionTitle('ওষুধের তালিকা'),
                 Card2(padding: EdgeInsets.zero, child: Column(children: [
-                  for (final i in items)
+                  for (final (k, i) in items.indexed)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       child: Row(children: [
                         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(i['medicine_name'], style: const TextStyle(fontWeight: FontWeight.w500)),
+                          Text(i['name'], style: const TextStyle(fontWeight: FontWeight.w500)),
                           if ((i['days'] ?? 0) > 0) Muted('${bn(i['days'])} দিনের'),
                         ])),
                         Container(
                           padding: const EdgeInsets.all(3),
                           decoration: BoxDecoration(color: const Color(0xFFEFEEF8), borderRadius: BorderRadius.circular(12)),
                           child: Row(children: [
-                            _seg('আছে', _avail[i['id']] == 'yes', waGreen, () => setState(() => _avail[i['id']] = 'yes')),
-                            _seg('নেই', _avail[i['id']] == 'no', const Color(0xFFE0532A), () => setState(() => _avail[i['id']] = 'no')),
+                            _seg('আছে', _avail['$k'] == 'yes', waGreen, () => setState(() => _avail['$k'] = 'yes')),
+                            _seg('নেই', _avail['$k'] == 'no', const Color(0xFFE0532A), () => setState(() => _avail['$k'] = 'no')),
                           ]),
                         ),
                       ]),

@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -79,7 +80,10 @@ class _LedgerState extends State<_Ledger> {
   Future<void> _add(OwnerCtx o, String kind) async {
     final r = await _entryDialog(context, kind == 'income' ? 'আয় যোগ' : 'ব্যয় যোগ');
     if (r == null) return;
-    await o.db.from('ledger_entries').insert({'pharmacy_id': o.pid, 'kind': kind, 'title': r['a'], 'amount': double.parse(r['b']!)});
+    await o.ref.collection('ledger').add({
+      'kind': kind, 'title': r['a'], 'amount': double.parse(r['b']!),
+      'entryDate': isoDate(DateTime.now()), 'createdAt': FieldValue.serverTimestamp(),
+    });
     o.touch();
   }
 
@@ -88,14 +92,17 @@ class _LedgerState extends State<_Ledger> {
     final o = context.watch<OwnerCtx>();
     final week = dateOnly(DateTime.now()).subtract(const Duration(days: 6));
     return Q<List<Map<String, dynamic>>>(
-      load: () => o.rows(o.db.from('ledger_entries').select().eq('pharmacy_id', o.pid)
-          .gte('entry_date', isoDate(_from.isBefore(week) ? _from : week)).order('created_at', ascending: false)),
+      load: () async => (await o.ref.collection('ledger')
+              .where('entryDate', isGreaterThanOrEqualTo: isoDate(_from.isBefore(week) ? _from : week)).get())
+          .docs.map(withId).toList()
+        ..sort((a, b) => '${b['entryDate']}${ts(b['createdAt'])?.millisecondsSinceEpoch ?? 0}'
+            .compareTo('${a['entryDate']}${ts(a['createdAt'])?.millisecondsSinceEpoch ?? 0}')),
       builder: (c, all) {
-        final rows = all.where((r) => !DateTime.parse(r['entry_date']).isBefore(_from)).toList();
+        final rows = all.where((r) => !DateTime.parse(r['entryDate']).isBefore(_from)).toList();
         final inc = rows.where((r) => r['kind'] == 'income').fold<num>(0, (a, r) => a + _n(r['amount']));
         final exp = rows.where((r) => r['kind'] == 'expense').fold<num>(0, (a, r) => a + _n(r['amount']));
         final days = [for (var i = 6; i >= 0; i--) dateOnly(DateTime.now()).subtract(Duration(days: i))];
-        final perDay = [for (final d in days) all.where((r) => r['kind'] == 'income' && r['entry_date'] == isoDate(d)).fold<num>(0, (a, r) => a + _n(r['amount']))];
+        final perDay = [for (final d in days) all.where((r) => r['kind'] == 'income' && r['entryDate'] == isoDate(d)).fold<num>(0, (a, r) => a + _n(r['amount']))];
         final maxV = perDay.fold<num>(1, (a, b) => b > a ? b : a);
         return ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 140), children: [
           Container(
@@ -152,11 +159,11 @@ class _LedgerState extends State<_Ledger> {
                 direction: DismissDirection.endToStart,
                 background: Container(color: noBg, alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20), child: const Icon(Icons.delete, color: noFg)),
                 confirmDismiss: (_) => confirm(context, 'এই হিসাবটি মুছবেন?'),
-                onDismissed: (_) async { await o.db.from('ledger_entries').delete().eq('id', r['id']); o.touch(); },
+                onDismissed: (_) async { await o.ref.collection('ledger').doc(r['id']).delete(); o.touch(); },
                 child: ListTile(
                   leading: IconTile(r['kind'] == 'income' ? Icons.payments : Icons.local_shipping, r['kind'] == 'income' ? Tint.green : Tint.orange, size: 38),
                   title: Text(r['title']),
-                  subtitle: Muted(bnDateShort(DateTime.parse(r['entry_date']))),
+                  subtitle: Muted(bnDateShort(DateTime.parse(r['entryDate']))),
                   trailing: Text('${r['kind'] == 'income' ? '+' : '−'}${bn(_n(r['amount']).toStringAsFixed(0))}',
                       style: TextStyle(fontWeight: FontWeight.w600, color: r['kind'] == 'income' ? okFg : noFg)),
                 ),
@@ -205,9 +212,9 @@ class _KhataState extends State<_Khata> {
   Future<void> _add(OwnerCtx o) async {
     final r = await _entryDialog(context, _dir == 'receivable' ? 'কার কাছে পাবো' : 'কাকে দেবো', phone: true, titleLabel: 'নাম');
     if (r == null) return;
-    await o.db.from('khata_entries').insert({
-      'pharmacy_id': o.pid, 'direction': _dir, 'party_name': r['a'], 'amount': double.parse(r['b']!),
-      'phone': r['p']!.isEmpty ? null : r['p'],
+    await o.ref.collection('khata').add({
+      'direction': _dir, 'partyName': r['a'], 'amount': double.parse(r['b']!), 'paid': 0,
+      'phone': r['p']!.isEmpty ? null : r['p'], 'createdAt': FieldValue.serverTimestamp(),
     });
     o.touch();
   }
@@ -218,7 +225,7 @@ class _KhataState extends State<_Khata> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: Text('${e['party_name']} — ${_dir == 'receivable' ? 'আদায়' : 'পরিশোধ'}'),
+        title: Text('${e['partyName']} — ${_dir == 'receivable' ? 'আদায়' : 'পরিশোধ'}'),
         content: TextField(controller: ctrl, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: 'কত টাকা? (বাকি ${bnMoney(left)})')),
         actions: [TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('বাতিল')), TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('সংরক্ষণ'))],
       ),
@@ -226,12 +233,15 @@ class _KhataState extends State<_Khata> {
     if (ok != true) return;
     final amt = (double.tryParse(en(ctrl.text.trim())) ?? 0).clamp(0, left).toDouble();
     if (amt <= 0) return;
-    await o.db.from('khata_entries').update({'paid': _n(e['paid']) + amt}).eq('id', e['id']);
-    // Money actually collected / paid out also lands in the books.
-    await o.db.from('ledger_entries').insert({
-      'pharmacy_id': o.pid, 'kind': _dir == 'receivable' ? 'income' : 'expense',
-      'title': _dir == 'receivable' ? 'বাকি আদায়: ${e['party_name']}' : 'পরিশোধ: ${e['party_name']}', 'amount': amt,
+    // Money actually collected / paid out also lands in the books (one atomic write).
+    final batch = o.db.batch();
+    batch.update(o.ref.collection('khata').doc(e['id']), {'paid': FieldValue.increment(amt)});
+    batch.set(o.ref.collection('ledger').doc(), {
+      'kind': _dir == 'receivable' ? 'income' : 'expense',
+      'title': _dir == 'receivable' ? 'বাকি আদায়: ${e['partyName']}' : 'পরিশোধ: ${e['partyName']}',
+      'amount': amt, 'entryDate': isoDate(DateTime.now()), 'createdAt': FieldValue.serverTimestamp(),
     });
+    await batch.commit();
     o.touch();
   }
 
@@ -245,12 +255,13 @@ class _KhataState extends State<_Khata> {
         child: FloatingActionButton(backgroundColor: context.pal.primaryDark, foregroundColor: Colors.white, onPressed: () => _add(o), child: const Icon(Icons.add)),
       ),
       body: Q<List<Map<String, dynamic>>>(
-        load: () => o.rows(o.db.from('khata_entries').select().eq('pharmacy_id', o.pid).eq('direction', _dir).order('created_at')),
+        load: () async => (await o.ref.collection('khata').where('direction', isEqualTo: _dir).get()).docs.map(withId).toList()
+          ..sort((a, b) => (ts(a['createdAt']) ?? DateTime.now()).compareTo(ts(b['createdAt']) ?? DateTime.now())),
         builder: (c, all) {
           final open = all.where((e) => _n(e['paid']) < _n(e['amount'])).toList();
-          final rows = open.where((e) => _q.isEmpty || '${e['party_name']}'.contains(_q)).toList();
+          final rows = open.where((e) => _q.isEmpty || '${e['partyName']}'.contains(_q)).toList();
           final total = open.fold<num>(0, (a, e) => a + _n(e['amount']) - _n(e['paid']));
-          final late = open.where((e) => DateTime.now().difference(DateTime.parse(e['created_at'])).inDays > 20).length;
+          final late = open.where((e) => DateTime.now().difference((ts(e['createdAt']) ?? DateTime.now())).inDays > 20).length;
           return ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 140), children: [
             Row(children: [
               Expanded(child: Chip2('আমি পাবো', selected: _dir == 'receivable', onTap: () => setState(() => _dir = 'receivable'))),
@@ -274,12 +285,12 @@ class _KhataState extends State<_Khata> {
             Card2(padding: EdgeInsets.zero, child: Column(children: [
               for (final e in rows)
                 Builder(builder: (context) {
-                  final days = DateTime.now().difference(DateTime.parse(e['created_at'])).inDays;
+                  final days = DateTime.now().difference((ts(e['createdAt']) ?? DateTime.now())).inDays;
                   final left = _n(e['amount']) - _n(e['paid']);
                   return ListTile(
                     onTap: () => _pay(o, e),
-                    leading: IconTile(Icons.person, Tint.all[('${e['party_name']}').hashCode.abs() % 6], round: true),
-                    title: Text(e['party_name'], style: const TextStyle(fontWeight: FontWeight.w500)),
+                    leading: IconTile(Icons.person, Tint.all[('${e['partyName']}').hashCode.abs() % 6], round: true),
+                    title: Text(e['partyName'], style: const TextStyle(fontWeight: FontWeight.w500)),
                     subtitle: Text(days == 0 ? 'আজ' : '${bn(days)} দিন আগে থেকে', style: TextStyle(fontSize: 13, color: days > 20 ? noFg : context.pal.muted)),
                     trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                       Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
@@ -292,7 +303,7 @@ class _KhataState extends State<_Khata> {
                           tooltip: 'মনে করান',
                           onPressed: () {
                             final n = en('${e['phone']}').replaceAll(RegExp(r'\D'), '');
-                            final text = 'আসসালামু আলাইকুম ${e['party_name']}, ${o.pharmacy!['name']}-এ আপনার ${bnMoney(left)} বাকি আছে। সুবিধামতো পরিশোধ করবেন।';
+                            final text = 'আসসালামু আলাইকুম ${e['partyName']}, ${o.pharmacy!['name']}-এ আপনার ${bnMoney(left)} বাকি আছে। সুবিধামতো পরিশোধ করবেন।';
                             launchUrl(Uri.parse('https://wa.me/${n.startsWith('0') ? '88$n' : n}?text=${Uri.encodeComponent(text)}'), mode: LaunchMode.externalApplication);
                           },
                         ),

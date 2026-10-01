@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/bn.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
+import '../../data/catalog.dart';
 import 'owner_ctx.dart';
 
 class StockPage extends StatefulWidget {
@@ -22,7 +23,7 @@ class _StockPageState extends State<StockPage> {
   }
 
   Future<void> _setStatus(OwnerCtx o, String id, String s) async {
-    await o.db.from('stock_items').update({'status': s}).eq('id', id);
+    await o.setStockStatus(id, s);
     o.touch();
   }
 
@@ -38,10 +39,10 @@ class _StockPageState extends State<StockPage> {
           onPressed: () => context.push(const StockFormPage()), child: const Icon(Icons.add)),
       ),
       body: Q<List<Map<String, dynamic>>>(
-        load: () => o.rows(o.db.from('stock_items').select().eq('pharmacy_id', o.pid).order('name')),
+        load: () async => (await o.ref.collection('stock').get()).docs.map(withId).toList()..sort((a, b) => '${a['name']}'.compareTo('${b['name']}')),
         builder: (c, all) {
           final rows = all.where((r) {
-            if (_q.isNotEmpty && !('${r['name']} ${r['generic_name'] ?? ''}').toLowerCase().contains(_q.toLowerCase())) return false;
+            if (_q.isNotEmpty && !('${r['name']} ${r['genericName'] ?? ''}').toLowerCase().contains(_q.toLowerCase())) return false;
             return switch (_f) { 'in' => r['status'] == 'in', 'low' => r['status'] == 'low', 'out' => r['status'] == 'out', 'exp' => _expiring(r), _ => true };
           }).toList();
           final buy = all.where((r) => r['status'] != 'in' || _expiring(r)).toList();
@@ -72,7 +73,7 @@ class _StockPageState extends State<StockPage> {
                   onTap: () => context.push(StockFormPage(item: r)),
                   onLongPress: () async {
                     if (await confirm(context, '"${r['name']}" স্টক থেকে মুছবেন?')) {
-                      await o.db.from('stock_items').delete().eq('id', r['id']);
+                      await o.deleteStock(r['id']);
                       o.touch();
                     }
                   },
@@ -81,7 +82,7 @@ class _StockPageState extends State<StockPage> {
                     child: Row(children: [
                       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Text(r['name'], style: const TextStyle(fontWeight: FontWeight.w500)),
-                        Muted([if (r['generic_name'] != null) r['generic_name'], if (_expiring(r)) 'মেয়াদ ${r['expiry']}'].join(' · ')),
+                        Muted([if (r['genericName'] != null) r['genericName'], if (_expiring(r)) 'মেয়াদ ${r['expiry']}'].join(' · ')),
                       ])),
                       Container(
                         padding: const EdgeInsets.all(3),
@@ -122,16 +123,16 @@ class _StockFormPageState extends State<StockFormPage> {
   final _key = GlobalKey<FormState>();
   late final i = widget.item;
   late final _name = TextEditingController(text: i?['name']);
-  late final _generic = TextEditingController(text: i?['generic_name']);
+  late final _generic = TextEditingController(text: i?['genericName']);
   late final _qty = TextEditingController(text: i?['qty'] == null ? '' : bn(i!['qty']));
   late final _unit = TextEditingController(text: i?['unit'] ?? 'পাতা');
-  late final _buy = TextEditingController(text: i?['buy_price'] == null ? '' : bn(i!['buy_price']));
-  late final _sell = TextEditingController(text: i?['sell_price'] == null ? '' : bn(i!['sell_price']));
-  late final _batch = TextEditingController(text: i?['batch_no']);
+  late final _buy = TextEditingController(text: i?['buyPrice'] == null ? '' : bn(i!['buyPrice']));
+  late final _sell = TextEditingController(text: i?['sellPrice'] == null ? '' : bn(i!['sellPrice']));
+  late final _batch = TextEditingController(text: i?['batchNo']);
   late String _form = i?['form'] ?? 'ট্যাবলেট';
   late String _status = i?['status'] ?? 'in';
   late final _expiry = TextEditingController(text: i?['expiry'] == null ? '' : bn((i!['expiry'] as String).substring(0, 7).split('-').reversed.join('/')));
-  List<Map<String, dynamic>> _hits = [];
+  List<CatalogItem> _hits = [];
 
   double? _num(TextEditingController c) => double.tryParse(en(c.text.trim()));
 
@@ -144,26 +145,21 @@ class _StockFormPageState extends State<StockFormPage> {
     return isoDate(DateTime(y, mo + 1, 0));
   }
 
-  Future<void> _search(OwnerCtx o, String q) async {
-    if (q.trim().length < 2) return setState(() => _hits = []);
-    final r = await o.rows(o.db.from('medicine_catalog').select().ilike('name', '%${q.trim()}%').limit(6));
-    if (mounted) setState(() => _hits = r);
+  void _search(String q) {
+    final t = q.trim();
+    setState(() => _hits = t.length < 2 ? [] : medicineCatalog.where((m) => m.name.contains(t) || m.generic.contains(t)).take(6).toList());
   }
 
   Future<void> _save(OwnerCtx o) async {
     if (!_key.currentState!.validate()) return;
     final data = {
-      'pharmacy_id': o.pid, 'name': _name.text.trim(),
-      'generic_name': _generic.text.trim().isEmpty ? null : _generic.text.trim(),
-      'form': _form, 'qty': _num(_qty), 'unit': _unit.text.trim(), 'buy_price': _num(_buy), 'sell_price': _num(_sell),
-      'expiry': _parseExpiry(), 'batch_no': _batch.text.trim().isEmpty ? null : _batch.text.trim(), 'status': _status,
+      'name': _name.text.trim(),
+      'genericName': _generic.text.trim().isEmpty ? null : _generic.text.trim(),
+      'form': _form, 'qty': _num(_qty), 'unit': _unit.text.trim(), 'buyPrice': _num(_buy), 'sellPrice': _num(_sell),
+      'expiry': _parseExpiry(), 'batchNo': _batch.text.trim().isEmpty ? null : _batch.text.trim(), 'status': _status,
     };
     try {
-      if (i == null) {
-        await o.db.from('stock_items').insert(data);
-      } else {
-        await o.db.from('stock_items').update(data).eq('id', i!['id']);
-      }
+      await o.saveStock(i?['id'], data);
       if (!mounted) return;
       o.touch();
       Navigator.pop(context);
@@ -181,17 +177,17 @@ class _StockFormPageState extends State<StockFormPage> {
         title: i == null ? 'ওষুধ যোগ' : 'ওষুধ সম্পাদনা',
         action: PrimaryButton('সংরক্ষণ করুন', onTap: () => _save(o)),
         children: [
-          Field('ওষুধের নাম', controller: _name, icon: Icons.search, onChanged: (v) => _search(o, v), validator: (v) => (v ?? '').trim().isEmpty ? 'নাম লিখুন' : null),
+          Field('ওষুধের নাম', controller: _name, icon: Icons.search, onChanged: _search, validator: (v) => (v ?? '').trim().isEmpty ? 'নাম লিখুন' : null),
           for (final h in _hits)
             Card2(
               margin: const EdgeInsets.only(bottom: 6),
               onTap: () => setState(() {
-                _name.text = h['name']; _generic.text = h['generic_name'] ?? ''; _form = h['form'] ?? _form; _hits = [];
+                _name.text = h.name; _generic.text = h.generic; _form = h.form; _hits = [];
               }),
               child: Row(children: [
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(h['name'], style: const TextStyle(fontWeight: FontWeight.w500)),
-                  Muted('${h['manufacturer'] ?? ''} · ${h['form'] ?? ''}'),
+                  Text(h.name, style: const TextStyle(fontWeight: FontWeight.w500)),
+                  Muted('${h.maker} · ${h.form}'),
                 ])),
                 Pill('+ নিন', context.pal.soft, context.pal.primaryDark),
               ]),

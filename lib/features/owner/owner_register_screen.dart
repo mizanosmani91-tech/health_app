@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart' show FieldValue;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/bn.dart';
@@ -27,13 +29,20 @@ class _OwnerRegisterScreenState extends State<OwnerRegisterScreen> {
     setState(() => _busy = true);
     try {
       final a = AuthService.instance;
-      final uid = a.user!.id;
-      final path = '$uid/license_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      await a.client.storage.from('licenses').upload(path, File(_licImage!));
-      await a.client.from('pharmacies').insert({
-        'owner_id': uid, 'name': _name.text.trim(), 'address': _addr.text.trim(),
-        'phone': en(_phone.text.trim()), 'license_no': en(_lic.text.trim()), 'license_path': path,
+      final uid = a.user!.uid;
+      // Firebase Storage needs a paid plan, so the licence photo is kept as a small
+      // compressed image in a private, owner/admin-only document (well under 1 MB).
+      final bytes = await File(_licImage!).readAsBytes();
+      if (bytes.length > 700 * 1024) throw StateError('ছবিটি বড়, আরেকটি ছোট ছবি দিন');
+      final batch = a.db.batch();
+      batch.set(a.db.collection('licenses').doc(uid), {'image': base64Encode(bytes), 'createdAt': FieldValue.serverTimestamp()});
+      batch.set(a.db.collection('pharmacies').doc(uid), {
+        'ownerId': uid, 'name': _name.text.trim(), 'address': _addr.text.trim(),
+        'phone': en(_phone.text.trim()), 'licenseNo': en(_lic.text.trim()),
+        'status': 'pending', 'isOpen': true, 'openFrom': '09:00', 'openTo': '22:00',
+        'weeklyOff': null, 'notifyNew': true, 'createdAt': FieldValue.serverTimestamp(),
       });
+      await batch.commit();
       if (mounted) await context.read<AppState>().setupDone();
     } catch (e) {
       if (mounted) context.toast('পাঠানো যায়নি: $e');
@@ -54,7 +63,7 @@ class _OwnerRegisterScreenState extends State<OwnerRegisterScreen> {
             Field('মোবাইল নম্বর', controller: _phone, icon: Icons.call, keyboard: TextInputType.phone, validator: _req),
             Field('ড্রাগ লাইসেন্স নম্বর', controller: _lic, icon: Icons.badge, validator: _req),
             GestureDetector(
-              onTap: () async { final f = await pickImage(camera: false); if (f != null) setState(() => _licImage = f); },
+              onTap: () async { final f = await pickImage(camera: false, maxWidth: 1000, quality: 60); if (f != null) setState(() => _licImage = f); },
               child: Container(
                 height: 130,
                 margin: const EdgeInsets.only(bottom: 14),
