@@ -17,20 +17,27 @@
 
 ## চালানোর ধাপ
 
-1. **সার্ভার:** VPS-এ [`server/README.md`](server/README.md)-র এক কমান্ডের সেটআপ (Node, systemd, Caddy-র স্বয়ংক্রিয় HTTPS, রোজকার ব্যাকআপ)।
-2. **Google:** Google Cloud Console-এ OAuth client বানান — **Web** client (এর ID-ই `GOOGLE_SERVER_CLIENT_ID`) এবং **Android** client (package `com.healthdiary.health_app` + SHA-1)। OAuth consent screen-এ `drive.appdata` স্কোপ যোগ করুন।
-3. **অ্যাপ:**
+1. **সার্ভার:** চালু আছে — `https://health-api.jagotech.com.bd` (সেটআপের বিবরণ: [`server/README.md`](server/README.md))। অ্যাপ এই URL ডিফল্ট ধরে।
+2. **Google:** Web client ID সার্ভারে বসানো। অ্যাপে একই ID `GOOGLE_SERVER_CLIENT_ID` হিসেবে দিতে হয়। এর পাশাপাশি **Android** OAuth client লাগে: package `com.healthdiary.health_app` + অ্যাপ সাইন করার চাবির **SHA-1**। OAuth consent screen-এ `drive.appdata` স্কোপ যোগ করুন।
+3. **চালানো:**
 
 ```sh
 flutter pub get
-flutter run \
-  --dart-define=API_BASE_URL=https://your-vps-domain \
-  --dart-define=GOOGLE_SERVER_CLIENT_ID=<web client id>.apps.googleusercontent.com
+flutter run --dart-define=GOOGLE_SERVER_CLIENT_ID=<web client id>.apps.googleusercontent.com
+# অন্য সার্ভারে টেস্ট করতে: --dart-define=API_BASE_URL=https://...
 ```
 
-`API_BASE_URL` না দিলে লগইন স্ক্রিনে **অফলাইন মোড** আসে (শুধু রোগী অংশ)।
-
 4. **ফার্মেসি যাচাই:** `server/README.md`-র "Verify a pharmacy" অংশ। যাচাই না হওয়া পর্যন্ত রোগীরা দোকান দেখে না।
+
+## APK বানানো (নিজের কম্পিউটারে Flutter ছাড়া)
+
+GitHub → **Actions → Build Android APK → Run workflow**। শেষে "health-diary-apk" ডাউনলোড করে ফোনে ইনস্টল করুন।
+
+- Repository **Variables**-এ `GOOGLE_SERVER_CLIENT_ID` রাখুন (Web client ID)।
+- Google লগইন কাজ করার জন্য অ্যাপ সবসময় **একই চাবিতে** সাইন হতে হবে। একবার চাবি বানান (নিজের কম্পিউটারে/VPS-এ):
+  `keytool -genkeypair -v -keystore release.jks -alias healthdiary -keyalg RSA -keysize 2048 -validity 10000`
+  তারপর Repository **Secrets**-এ দিন: `ANDROID_KEYSTORE_BASE64` (`base64 -w0 release.jks`), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`।
+  workflow শেষে এই চাবির SHA-1 লগে ছাপে — সেটাই Google Android OAuth client-এ দিন। **এই `.jks` ফাইল কখনও রিপোতে তুলবেন না, আর হারাবেন না।**
 
 ## কাঠামো
 
