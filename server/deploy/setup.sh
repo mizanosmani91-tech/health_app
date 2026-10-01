@@ -104,7 +104,16 @@ if [[ $USE_NGINX -eq 1 ]]; then
   echo "==> nginx vhost + Let's Encrypt for $DOMAIN (your other sites are not touched)"
   systemctl disable --now caddy 2>/dev/null || true
   apt-get install -y certbot python3-certbot-nginx
-  cat > /etc/nginx/sites-available/health-diary <<NGINX
+  # Debian-style (sites-available/sites-enabled) or conf.d-style layout, whichever this nginx actually loads.
+  if [[ -d /etc/nginx/sites-enabled ]] && nginx -T 2>/dev/null | grep -q 'sites-enabled'; then
+    NGX_CONF=/etc/nginx/sites-available/health-diary
+    NGX_LINK=/etc/nginx/sites-enabled/health-diary
+  else
+    NGX_CONF=/etc/nginx/conf.d/health-diary.conf
+    NGX_LINK=""
+  fi
+  mkdir -p "$(dirname "$NGX_CONF")"
+  cat > "$NGX_CONF" <<NGINX
 server {
     listen 80;
     listen [::]:80;
@@ -119,7 +128,8 @@ server {
     }
 }
 NGINX
-  ln -sf /etc/nginx/sites-available/health-diary /etc/nginx/sites-enabled/health-diary
+  [[ -z "$NGX_LINK" ]] || ln -sf "$NGX_CONF" "$NGX_LINK"
+  echo "nginx config written to $NGX_CONF"
   nginx -t
   systemctl reload nginx
   CB=(--nginx -d "$DOMAIN" --non-interactive --agree-tos --redirect)
