@@ -1,0 +1,43 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../core/widgets.dart';
+import 'books_page.dart';
+import 'owner_ctx.dart';
+import 'owner_home_page.dart';
+import 'owner_profile_page.dart';
+import 'requests_page.dart';
+import 'stock_page.dart';
+
+class OwnerShell extends StatelessWidget {
+  const OwnerShell({super.key});
+  @override
+  Widget build(BuildContext context) => ChangeNotifierProvider(
+        create: (_) => OwnerCtx()..load(),
+        child: const _Body(),
+      );
+}
+
+class _Body extends StatefulWidget {
+  const _Body();
+  @override
+  State<_Body> createState() => _BodyState();
+}
+
+class _BodyState extends State<_Body> {
+  int _i = 0;
+  void go(int i) => setState(() => _i = i);
+
+  @override
+  Widget build(BuildContext context) {
+    final o = context.watch<OwnerCtx>();
+    if (o.pharmacy == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    return Scaffold(
+      extendBody: true,
+      body: IndexedStack(index: _i, children: [OwnerHomePage(go: go), const RequestsPage(), const StockPage(), const BooksPage(), const OwnerProfilePage()]),
+      bottomNavigationBar: BottomBar(index: _i, onTap: go, items: const [
+        (Icons.space_dashboard, 'হোম'), (Icons.inbox, 'অনুরোধ'), (Icons.inventory_2, 'স্টক'),
+        (Icons.account_balance_wallet, 'হিসাব'), (Icons.storefront, 'প্রোফাইল'),
+      ]),
+    );
+  }
+}
