@@ -39,7 +39,7 @@ class _StockPageState extends State<StockPage> {
           onPressed: () => context.push(const StockFormPage()), child: const Icon(Icons.add)),
       ),
       body: Q<List<Map<String, dynamic>>>(
-        load: () async => (await o.ref.collection('stock').get()).docs.map(withId).toList()..sort((a, b) => '${a['name']}'.compareTo('${b['name']}')),
+        load: () => o.api.list('/stock'),
         builder: (c, all) {
           final rows = all.where((r) {
             if (_q.isNotEmpty && !('${r['name']} ${r['genericName'] ?? ''}').toLowerCase().contains(_q.toLowerCase())) return false;

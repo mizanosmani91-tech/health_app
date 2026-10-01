@@ -30,7 +30,19 @@ class _BodyState extends State<_Body> {
   @override
   Widget build(BuildContext context) {
     final o = context.watch<OwnerCtx>();
-    if (o.pharmacy == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (o.pharmacy == null) {
+      return Scaffold(
+        body: Center(
+          child: o.error == null
+              ? const CircularProgressIndicator()
+              : Column(mainAxisSize: MainAxisSize.min, children: [
+                  Text(o.error!, textAlign: TextAlign.center),
+                  const SizedBox(height: 12),
+                  FilledButton(onPressed: o.load, child: const Text('আবার চেষ্টা করুন')),
+                ]),
+        ),
+      );
+    }
     return Scaffold(
       extendBody: true,
       body: IndexedStack(index: _i, children: [OwnerHomePage(go: go), const RequestsPage(), const StockPage(), const BooksPage(), const OwnerProfilePage()]),

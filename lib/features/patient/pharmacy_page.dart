@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -9,7 +8,7 @@ import '../../core/widgets.dart';
 import '../../data/local_db.dart';
 import '../../data/models.dart';
 import '../../services/app_state.dart';
-import '../../services/auth_service.dart';
+import '../../services/api.dart';
 
 String _waNumber(String phone) {
   final d = en(phone).replaceAll(RegExp(r'\D'), '');
@@ -189,37 +188,21 @@ class _PharmacyPageState extends State<PharmacyPage> {
     );
   }
 
-  /// Verified pharmacies, each with one public stock doc (name + in/low/out only).
+  /// Server returns only name + in/low/out per pharmacy (never prices or quantities).
   Future<List<Map<String, dynamic>>> _doSearch(List<String> names) async {
     if (!Config.hasBackend) return [];
-    final db = AuthService.instance.db;
-    final phs = (await db.collection('pharmacies').where('status', isEqualTo: 'verified').limit(50).get()).docs;
-    final stocks = await Future.wait(phs.map((p) => db.collection('stockPublic').doc(p.id).get()));
-    const rank = {'in': 3, 'low': 2, 'out': 1};
-    final out = <Map<String, dynamic>>[];
-    for (final (i, p) in phs.indexed) {
-      final d = p.data();
-      final sd = stocks[i].data();
-      final items = ((sd?['items'] as Map?)?.values ?? const []).cast<Map>();
-      for (final n in names) {
-        final q = n.toLowerCase();
-        var best = 'unknown';
-        for (final it in items) {
-          if (!('${it['n']} ${it['g'] ?? ''}'.toLowerCase().contains(q))) continue;
-          final st = '${it['s']}';
-          if ((rank[st] ?? 0) > (rank[best] ?? 0)) best = st;
+    final rows = await Api.instance.post('/search', {'names': names}) as List;
+    return [
+      for (final r in rows.cast<Map<String, dynamic>>())
+        {
+          'pharmacy_id': r['pharmacyId'], 'pharmacy_name': r['pharmacyName'], 'address': r['address'],
+          'phone': r['phone'], 'is_open': r['isOpen'], 'medicine_name': r['medicineName'],
+          'status': r['status'], 'updated_at': r['updatedAt'],
         }
-        out.add({
-          'pharmacy_id': p.id, 'pharmacy_name': d['name'], 'address': d['address'], 'phone': d['phone'],
-          'is_open': d['isOpen'], 'medicine_name': n, 'status': best,
-          'updated_at': ts2(sd?['updatedAt'])?.toIso8601String(),
-        });
-      }
-    }
-    return out;
+    ];
   }
 
-  DateTime? ts2(dynamic v) => v is Timestamp ? v.toDate() : null;
+  DateTime? ts2(dynamic v) => v is String ? DateTime.tryParse(v)?.toLocal() : null;
 
   Widget _resultList(BuildContext context, List<Map<String, dynamic>> rows, Member me) {
     final byPh = <String, List<Map<String, dynamic>>>{};
@@ -284,12 +267,9 @@ class _PharmacyPageState extends State<PharmacyPage> {
 
   Future<void> _sendRequest(BuildContext context, Map<String, dynamic> head, List<Map<String, dynamic>> list, Member me) async {
     try {
-      final a = AuthService.instance;
-      await a.db.collection('requests').add({
-        'pharmacyId': head['pharmacy_id'], 'pharmacyName': head['pharmacy_name'], 'pharmacyPhone': head['phone'],
-        'patientId': a.user!.uid, 'patientName': me.name, 'status': 'new', 'replyMessage': null,
-        'items': [for (final r in list) {'name': r['medicine_name'], 'days': 0, 'availability': 'pending'}],
-        'createdAt': FieldValue.serverTimestamp(),
+      await Api.instance.post('/requests', {
+        'pharmacyId': head['pharmacy_id'], 'patientName': me.name,
+        'items': [for (final r in list) {'name': r['medicine_name'], 'days': 0}],
       });
       if (context.mounted) context.toast('অনুরোধ পাঠানো হয়েছে');
       setState(() => _tab = 2);
@@ -300,11 +280,8 @@ class _PharmacyPageState extends State<PharmacyPage> {
 
   // ---- my requests --------------------------------------------------------
   Widget _requests(BuildContext context) {
-    final uid = AuthService.instance.user?.uid;
     return Q<List<Map<String, dynamic>>>(
-      load: () async => (await AuthService.instance.db.collection('requests').where('patientId', isEqualTo: uid).get())
-          .docs.map((d) => {...d.data(), 'id': d.id}).toList()
-        ..sort((a, b) => (ts2(b['createdAt']) ?? DateTime.now()).compareTo(ts2(a['createdAt']) ?? DateTime.now())),
+      load: () => Api.instance.list('/requests'),
       builder: (c, rows) {
         if (rows.isEmpty) return const Empty(Icons.inbox, 'এখনো কোনো অনুরোধ পাঠাননি।');
         return Column(children: [

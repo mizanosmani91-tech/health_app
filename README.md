@@ -9,32 +9,28 @@
 
 ## ডাটা কোথায় থাকে
 
-- **রোগীর স্বাস্থ্য তথ্য** (ভিজিট, ওষুধ, টেস্ট, ছবি) শুধু **ফোনের SQLite-এ**; ব্যাকআপ নিজের Google Drive-এর hidden app-data ফোল্ডারে (`drive.appdata` স্কোপ, শেষ ১০টি রাখা হয়)। আমাদের সার্ভারে যায় না।
-- **Firebase (Spark / ফ্রি প্ল্যান)** শুধু শেয়ার্ড অংশ: Auth (Google), Firestore-এ রোল, ফার্মেসি, স্টক স্ট্যাটাস, অনুরোধ, মালিকের হিসাব। Firebase ফ্রি প্ল্যানে প্রজেক্ট নিষ্ক্রিয় থাকলেও **ঘুমিয়ে/পজ হয় না**। নিয়ম: [`firebase/firestore.rules`](firebase/firestore.rules)।
-- গোপনীয়তা: দাম/পরিমাণ/ব্যাচ থাকে `pharmacies/{id}/stock` (শুধু মালিক)। রোগী পড়ে শুধু `stockPublic/{id}` (নাম + আছে/কম/নেই), প্রতি ফার্মেসিতে ১টি রিড, তাই ফ্রি কোটায় থাকে। ফার্মেসির `status` (যাচাই) মালিক বদলাতে পারে না।
+- **রোগীর স্বাস্থ্য তথ্য** (ভিজিট, ওষুধ, টেস্ট, ছবি) শুধু **ফোনের SQLite-এ**; ব্যাকআপ নিজের Google Drive-এর hidden app-data ফোল্ডারে (`drive.appdata`, শেষ ১০টি রাখা হয়)। সার্ভারে যায় না।
+- **নিজের VPS-এ ছোট API সার্ভার** ([`server/`](server/), Node + SQLite) শুধু শেয়ার্ড অংশ রাখে: অ্যাকাউন্ট/রোল, ফার্মেসি, স্টক স্ট্যাটাস, অনুরোধ, মালিকের হিসাব। কোনো ফ্রি-টায়ার "ঘুমিয়ে যাওয়া" নেই, মাসিক বাড়তি খরচ নেই।
+- লগইন: অ্যাপে Google নেটিভ সাইন-ইন → সার্ভার Google ID টোকেন যাচাই করে নিজের সেশন টোকেন দেয়।
+- গোপনীয়তা: রোগী শুধু `আছে/কম/নেই` পায়, দাম/পরিমাণ/ব্যাচ শুধু মালিক। ফার্মেসির যাচাই (`status`) মালিক বদলাতে পারে না। রোল একবারই বাছা যায়।
 - রিমাইন্ডার লোকাল নোটিফিকেশন, ইন্টারনেট ছাড়াই চলে।
-- লাইসেন্সের ছবি: Firebase Storage-এ এখন পেইড প্ল্যান লাগে, তাই ছোট করে (≤৭০০ KB) মালিক-গোপন Firestore ডকুমেন্টে রাখা হয়।
 
 ## চালানোর ধাপ
 
-1. [Firebase console](https://console.firebase.google.com)-এ প্রজেক্ট খুলুন (Spark প্ল্যান)। Authentication → Sign-in method → **Google** চালু করুন। **Firestore Database** বানান (production mode)।
-2. Firestore → Rules-এ `firebase/firestore.rules`-এর লেখা পেস্ট করে Publish করুন।
-3. Project settings → Android app যোগ করুন: package `com.healthdiary.health_app` + আপনার SHA-1। সেখান থেকে `apiKey`, `appId`, `projectId`, `messagingSenderId` নিন। Authentication → Google প্রোভাইডারের **Web client ID**-ই `GOOGLE_SERVER_CLIENT_ID`। Drive ব্যাকআপের জন্য Google Cloud-এ OAuth consent screen-এ `drive.appdata` স্কোপ যোগ করুন।
-4. চালান:
+1. **সার্ভার:** VPS-এ [`server/README.md`](server/README.md)-র এক কমান্ডের সেটআপ (Node, systemd, Caddy-র স্বয়ংক্রিয় HTTPS, রোজকার ব্যাকআপ)।
+2. **Google:** Google Cloud Console-এ OAuth client বানান — **Web** client (এর ID-ই `GOOGLE_SERVER_CLIENT_ID`) এবং **Android** client (package `com.healthdiary.health_app` + SHA-1)। OAuth consent screen-এ `drive.appdata` স্কোপ যোগ করুন।
+3. **অ্যাপ:**
 
 ```sh
 flutter pub get
 flutter run \
-  --dart-define=FIREBASE_API_KEY=... \
-  --dart-define=FIREBASE_APP_ID=... \
-  --dart-define=FIREBASE_PROJECT_ID=... \
-  --dart-define=FIREBASE_SENDER_ID=... \
+  --dart-define=API_BASE_URL=https://your-vps-domain \
   --dart-define=GOOGLE_SERVER_CLIENT_ID=<web client id>.apps.googleusercontent.com
 ```
 
-Firebase কনফিগ না থাকলে লগইন স্ক্রিনে **অফলাইন মোড** আসে (শুধু রোগী অংশ)।
+`API_BASE_URL` না দিলে লগইন স্ক্রিনে **অফলাইন মোড** আসে (শুধু রোগী অংশ)।
 
-5. ফার্মেসি যাচাই (অ্যাডমিন): Firestore-এ `pharmacies/{মালিকের uid}` ডকুমেন্টে `status` = `verified` করুন (লাইসেন্স দেখতে `licenses/{uid}.image` — base64 ছবি)। যাচাই না হওয়া পর্যন্ত রোগীরা দোকান দেখে না।
+4. **ফার্মেসি যাচাই:** `server/README.md`-র "Verify a pharmacy" অংশ। যাচাই না হওয়া পর্যন্ত রোগীরা দোকান দেখে না।
 
 ## কাঠামো
 
@@ -42,12 +38,12 @@ Firebase কনফিগ না থাকলে লগইন স্ক্রি�
 lib/
   core/       থিম (রোগী: টিল, মালিক: ইন্ডিগো), বাংলা সংখ্যা/তারিখ, শেয়ার্ড উইজেট
   data/       SQLite (রোগীর ডাটা) + মডেল
-  services/   auth (Google→Firebase), নোটিফিকেশন, Drive ব্যাকআপ, অ্যাপ স্টেট
+  services/   API ক্লায়েন্ট, Google লগইন, নোটিফিকেশন, Drive ব্যাকআপ, অ্যাপ স্টেট
   features/
     auth/     অনবোর্ডিং, লগইন, রোল বাছাই
     patient/  হোম, ওষুধ, ভিজিট+টেস্ট, ফার্মেসি, সেটিংস
     owner/    রেজিস্ট্রেশন, হোম, অনুরোধ, স্টক, হিসাব+বাকি, প্রোফাইল
-firebase/firestore.rules
+server/      API সার্ভার (Node + SQLite) ও ডিপ্লয় স্ক্রিপ্ট
 ```
 
 ## এখনো করা হয়নি

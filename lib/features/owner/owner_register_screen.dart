@@ -1,12 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart' show FieldValue;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/bn.dart';
 import '../../core/widgets.dart';
 import '../../services/app_state.dart';
-import '../../services/auth_service.dart';
+import '../../services/api.dart';
 import '../../services/images.dart';
 
 class OwnerRegisterScreen extends StatefulWidget {
@@ -28,21 +27,14 @@ class _OwnerRegisterScreenState extends State<OwnerRegisterScreen> {
     if (_licImage == null) { context.toast('লাইসেন্সের ছবি দিন'); return; }
     setState(() => _busy = true);
     try {
-      final a = AuthService.instance;
-      final uid = a.user!.uid;
-      // Firebase Storage needs a paid plan, so the licence photo is kept as a small
-      // compressed image in a private, owner/admin-only document (well under 1 MB).
+      // Kept small (<=700 KB); the server stores it privately for admin verification only.
       final bytes = await File(_licImage!).readAsBytes();
       if (bytes.length > 700 * 1024) throw StateError('ছবিটি বড়, আরেকটি ছোট ছবি দিন');
-      final batch = a.db.batch();
-      batch.set(a.db.collection('licenses').doc(uid), {'image': base64Encode(bytes), 'createdAt': FieldValue.serverTimestamp()});
-      batch.set(a.db.collection('pharmacies').doc(uid), {
-        'ownerId': uid, 'name': _name.text.trim(), 'address': _addr.text.trim(),
+      await Api.instance.post('/pharmacy', {
+        'name': _name.text.trim(), 'address': _addr.text.trim(),
         'phone': en(_phone.text.trim()), 'licenseNo': en(_lic.text.trim()),
-        'status': 'pending', 'isOpen': true, 'openFrom': '09:00', 'openTo': '22:00',
-        'weeklyOff': null, 'notifyNew': true, 'createdAt': FieldValue.serverTimestamp(),
+        'licenseImage': base64Encode(bytes),
       });
-      await batch.commit();
       if (mounted) await context.read<AppState>().setupDone();
     } catch (e) {
       if (mounted) context.toast('পাঠানো যায়নি: $e');

@@ -39,4 +39,10 @@ class Prefs {
       };
   static set cachedRole(UserRole? v) =>
       v == null ? _p.remove('role') : _p.setString('role', v.name);
+
+  static String? get apiToken => _p.getString('api_token');
+  static set apiToken(String? v) => v == null ? _p.remove('api_token') : _p.setString('api_token', v);
+
+  static String? get userEmail => _p.getString('user_email');
+  static set userEmail(String? v) => v == null ? _p.remove('user_email') : _p.setString('user_email', v);
 }

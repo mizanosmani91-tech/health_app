@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -80,10 +79,7 @@ class _LedgerState extends State<_Ledger> {
   Future<void> _add(OwnerCtx o, String kind) async {
     final r = await _entryDialog(context, kind == 'income' ? 'আয় যোগ' : 'ব্যয় যোগ');
     if (r == null) return;
-    await o.ref.collection('ledger').add({
-      'kind': kind, 'title': r['a'], 'amount': double.parse(r['b']!),
-      'entryDate': isoDate(DateTime.now()), 'createdAt': FieldValue.serverTimestamp(),
-    });
+    await o.api.post('/ledger', {'kind': kind, 'title': r['a'], 'amount': double.parse(r['b']!)});
     o.touch();
   }
 
@@ -92,11 +88,7 @@ class _LedgerState extends State<_Ledger> {
     final o = context.watch<OwnerCtx>();
     final week = dateOnly(DateTime.now()).subtract(const Duration(days: 6));
     return Q<List<Map<String, dynamic>>>(
-      load: () async => (await o.ref.collection('ledger')
-              .where('entryDate', isGreaterThanOrEqualTo: isoDate(_from.isBefore(week) ? _from : week)).get())
-          .docs.map(withId).toList()
-        ..sort((a, b) => '${b['entryDate']}${ts(b['createdAt'])?.millisecondsSinceEpoch ?? 0}'
-            .compareTo('${a['entryDate']}${ts(a['createdAt'])?.millisecondsSinceEpoch ?? 0}')),
+      load: () => o.api.list('/ledger', query: {'from': isoDate(_from.isBefore(week) ? _from : week)}),
       builder: (c, all) {
         final rows = all.where((r) => !DateTime.parse(r['entryDate']).isBefore(_from)).toList();
         final inc = rows.where((r) => r['kind'] == 'income').fold<num>(0, (a, r) => a + _n(r['amount']));
@@ -159,7 +151,7 @@ class _LedgerState extends State<_Ledger> {
                 direction: DismissDirection.endToStart,
                 background: Container(color: noBg, alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20), child: const Icon(Icons.delete, color: noFg)),
                 confirmDismiss: (_) => confirm(context, 'এই হিসাবটি মুছবেন?'),
-                onDismissed: (_) async { await o.ref.collection('ledger').doc(r['id']).delete(); o.touch(); },
+                onDismissed: (_) async { await o.api.delete('/ledger/${r['id']}'); o.touch(); },
                 child: ListTile(
                   leading: IconTile(r['kind'] == 'income' ? Icons.payments : Icons.local_shipping, r['kind'] == 'income' ? Tint.green : Tint.orange, size: 38),
                   title: Text(r['title']),
@@ -212,9 +204,9 @@ class _KhataState extends State<_Khata> {
   Future<void> _add(OwnerCtx o) async {
     final r = await _entryDialog(context, _dir == 'receivable' ? 'কার কাছে পাবো' : 'কাকে দেবো', phone: true, titleLabel: 'নাম');
     if (r == null) return;
-    await o.ref.collection('khata').add({
-      'direction': _dir, 'partyName': r['a'], 'amount': double.parse(r['b']!), 'paid': 0,
-      'phone': r['p']!.isEmpty ? null : r['p'], 'createdAt': FieldValue.serverTimestamp(),
+    await o.api.post('/khata', {
+      'direction': _dir, 'partyName': r['a'], 'amount': double.parse(r['b']!),
+      'phone': r['p']!.isEmpty ? null : r['p'],
     });
     o.touch();
   }
@@ -233,15 +225,8 @@ class _KhataState extends State<_Khata> {
     if (ok != true) return;
     final amt = (double.tryParse(en(ctrl.text.trim())) ?? 0).clamp(0, left).toDouble();
     if (amt <= 0) return;
-    // Money actually collected / paid out also lands in the books (one atomic write).
-    final batch = o.db.batch();
-    batch.update(o.ref.collection('khata').doc(e['id']), {'paid': FieldValue.increment(amt)});
-    batch.set(o.ref.collection('ledger').doc(), {
-      'kind': _dir == 'receivable' ? 'income' : 'expense',
-      'title': _dir == 'receivable' ? 'বাকি আদায়: ${e['partyName']}' : 'পরিশোধ: ${e['partyName']}',
-      'amount': amt, 'entryDate': isoDate(DateTime.now()), 'createdAt': FieldValue.serverTimestamp(),
-    });
-    await batch.commit();
+    // The server also books the money as income/expense, atomically.
+    await o.api.post('/khata/${e['id']}/pay', {'amount': amt});
     o.touch();
   }
 
@@ -255,8 +240,7 @@ class _KhataState extends State<_Khata> {
         child: FloatingActionButton(backgroundColor: context.pal.primaryDark, foregroundColor: Colors.white, onPressed: () => _add(o), child: const Icon(Icons.add)),
       ),
       body: Q<List<Map<String, dynamic>>>(
-        load: () async => (await o.ref.collection('khata').where('direction', isEqualTo: _dir).get()).docs.map(withId).toList()
-          ..sort((a, b) => (ts(a['createdAt']) ?? DateTime.now()).compareTo(ts(b['createdAt']) ?? DateTime.now())),
+        load: () => o.api.list('/khata', query: {'direction': _dir}),
         builder: (c, all) {
           final open = all.where((e) => _n(e['paid']) < _n(e['amount'])).toList();
           final rows = open.where((e) => _q.isEmpty || '${e['partyName']}'.contains(_q)).toList();

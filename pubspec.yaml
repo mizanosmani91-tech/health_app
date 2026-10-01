@@ -49,10 +49,6 @@ dependencies:
   shared_preferences: ^2.5.5
   google_fonts: ^6.3.3
   http: ^1.6.0
-  firebase_core: ^4.15.0
-  firebase_auth: ^6.7.0
-  cloud_firestore: ^6.10.0
-
 dev_dependencies:
   flutter_test:
     sdk: flutter

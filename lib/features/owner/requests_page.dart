@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/bn.dart';
@@ -30,9 +29,7 @@ class _RequestsPageState extends State<RequestsPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('অনুরোধ', style: TextStyle(fontWeight: FontWeight.w600))),
       body: Q<List<Map<String, dynamic>>>(
-        load: () async => ((await o.db.collection('requests').where('pharmacyId', isEqualTo: o.pid).get()).docs.map(withId)
-            .where((r) => r['status'] == _f).toList()
-          ..sort((a, b) => (ts(b['createdAt']) ?? DateTime.now()).compareTo(ts(a['createdAt']) ?? DateTime.now()))),
+        load: () async => (await o.api.list('/requests')).where((r) => r['status'] == _f).toList(),
         builder: (c, rows) => ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 140), children: [
           Row(children: [
             Chip2('নতুন', selected: _f == 'new', onTap: () => setState(() => _f = 'new')),
@@ -76,9 +73,9 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
   Future<void> _send(OwnerCtx o, List items) async {
     setState(() => _busy = true);
     try {
-      await o.db.collection('requests').doc(widget.id).update({
-        'items': [for (final (i, it) in items.indexed) {...(it as Map<String, dynamic>), 'availability': _avail['$i'] ?? 'pending'}],
-        'status': 'replied', 'replyMessage': _msg.text.trim(), 'repliedAt': FieldValue.serverTimestamp(),
+      await o.api.post('/requests/${widget.id}/reply', {
+        'items': [for (var i = 0; i < items.length; i++) _avail['$i'] ?? 'pending'],
+        'message': _msg.text.trim(),
       });
       if (!mounted) return;
       o.touch();
@@ -105,7 +102,7 @@ class _RequestDetailPageState extends State<RequestDetailPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('অনুরোধ', style: TextStyle(fontWeight: FontWeight.w600))),
       body: FutureBuilder<Map<String, dynamic>>(
-        future: o.db.collection('requests').doc(widget.id).get().then(withId),
+        future: o.api.get('/requests/${widget.id}').then((v) => v as Map<String, dynamic>),
         builder: (c, s) {
           if (!s.hasData) return const Center(child: CircularProgressIndicator());
           final r = s.data!;

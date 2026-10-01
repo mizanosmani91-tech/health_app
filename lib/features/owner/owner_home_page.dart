@@ -15,8 +15,7 @@ class OwnerHomePage extends StatelessWidget {
     final o = context.watch<OwnerCtx>();
     final ph = o.pharmacy!;
     return Q<List<Map<String, dynamic>>>(
-      load: () async => ((await o.db.collection('requests').where('pharmacyId', isEqualTo: o.pid).get()).docs.map(withId).toList()
-        ..sort((a, b) => (ts(b['createdAt']) ?? DateTime.now()).compareTo(ts(a['createdAt']) ?? DateTime.now()))),
+      load: () => o.api.list('/requests'),
       builder: (c, reqs) {
         final today = dateOnly(DateTime.now());
         final fresh = reqs.where((r) => r['status'] == 'new').toList();

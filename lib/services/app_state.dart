@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'api.dart';
 import '../core/config.dart';
 import '../data/local_db.dart';
 import '../data/models.dart';
@@ -19,16 +19,6 @@ class AppState extends ChangeNotifier {
   final _auth = AuthService.instance;
 
   Future<void> start() async {
-    if (Config.hasBackend) {
-      var wasSignedIn = FirebaseAuth.instance.currentUser != null;
-      FirebaseAuth.instance.authStateChanges().listen((u) {
-        if (u == null && wasSignedIn) {
-          role = null;
-          _resolve();
-        }
-        wasSignedIn = u != null;
-      });
-    }
     await _resolve();
   }
 
@@ -40,6 +30,13 @@ class AppState extends ChangeNotifier {
       if (!Config.hasBackend || _auth.user == null) return _go(Stage.login);
       try {
         role ??= await _auth.loadRole();
+      } on ApiException catch (e) {
+        if (e.unauthorized) {
+          // Session expired or revoked: sign in again.
+          await _auth.signOut();
+          return _go(Stage.login);
+        }
+        role ??= Prefs.cachedRole;
       } catch (_) {
         // Offline with a cached session: fall back to the last known role.
         role ??= Prefs.cachedRole;
@@ -58,8 +55,12 @@ class AppState extends ChangeNotifier {
   }
 
   Future<bool> _hasPharmacy() async {
-    // The pharmacy doc id is the owner's uid.
-    return (await _auth.db.collection('pharmacies').doc(_auth.user!.uid).get()).exists;
+    try {
+      await Api.instance.get('/pharmacy');
+      return true;
+    } on ApiException catch (e) {
+      return e.status != 404; // offline etc.: let the owner shell show a retry screen
+    }
   }
 
   void _go(Stage s) {
