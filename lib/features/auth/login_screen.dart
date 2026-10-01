@@ -58,7 +58,7 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 14),
               Card2(
                 color: const Color(0xFFFFF0D1),
-                child: const Text('Firebase কনফিগার করা নেই (FIREBASE_* ভ্যারিয়েবল)। '
+                child: const Text('সার্ভার কনফিগার করা নেই (API_BASE_URL)। '
                     'চাইলে নিচের বোতামে অফলাইন মোডে শুধু রোগী/পরিবারের অংশ চালিয়ে দেখতে পারেন।',
                     style: TextStyle(color: Color(0xFF6B4305), height: 1.5)),
               ),
