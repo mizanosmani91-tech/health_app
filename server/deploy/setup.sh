@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installs the Health Diary API on an Ubuntu VPS: Node 22, PostgreSQL, the app (systemd), Caddy (automatic HTTPS),
+# Installs the Health Diary API on an Ubuntu VPS: Node 22, PostgreSQL, the app (systemd), HTTPS (Caddy, or an nginx vhost + certbot if nginx already serves your other sites),
 # and daily database backups. Safe to re-run (updates code, runs new migrations, keeps secrets and data).
 #
 #   git clone https://github.com/mizanosmani91-tech/health_app && cd health_app
@@ -33,7 +33,11 @@ if [[ $need_node -eq 1 ]]; then
   apt-get install -y nodejs
 fi
 
-if ! command -v caddy >/dev/null; then
+# If something (e.g. nginx for your other apps) already owns ports 80/443, add a vhost there instead of Caddy.
+USE_NGINX=0
+if command -v nginx >/dev/null && ss -tln | grep -qE ':(80|443)\s'; then USE_NGINX=1; fi
+
+if [[ $USE_NGINX -eq 0 ]] && ! command -v caddy >/dev/null; then
   echo "==> installing Caddy"
   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor --yes -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' > /etc/apt/sources.list.d/caddy-stable.list
@@ -96,16 +100,46 @@ systemctl daemon-reload
 systemctl enable health-diary
 systemctl restart health-diary
 
-echo "==> Caddy (HTTPS for $DOMAIN)"
-cat > /etc/caddy/health-diary.caddy <<CADDY
+if [[ $USE_NGINX -eq 1 ]]; then
+  echo "==> nginx vhost + Let's Encrypt for $DOMAIN (your other sites are not touched)"
+  systemctl disable --now caddy 2>/dev/null || true
+  apt-get install -y certbot python3-certbot-nginx
+  cat > /etc/nginx/sites-available/health-diary <<NGINX
+server {
+    listen 80;
+    listen [::]:80;
+    server_name $DOMAIN;
+    client_max_body_size 2m;
+    location / {
+        proxy_pass http://127.0.0.1:8787;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+NGINX
+  ln -sf /etc/nginx/sites-available/health-diary /etc/nginx/sites-enabled/health-diary
+  nginx -t
+  systemctl reload nginx
+  CB=(--nginx -d "$DOMAIN" --non-interactive --agree-tos --redirect)
+  if [[ -n "${CERTBOT_EMAIL:-}" ]]; then CB+=(-m "$CERTBOT_EMAIL"); else CB+=(--register-unsafely-without-email); fi
+  if ! certbot "${CB[@]}"; then
+    echo "!! HTTPS certificate was NOT issued (see message above). The API is running; plain HTTP works at http://$DOMAIN/health."
+    echo "!! Fix DNS/domain and re-run this script, or run: sudo certbot --nginx -d $DOMAIN"
+  fi
+else
+  echo "==> Caddy (HTTPS for $DOMAIN)"
+  cat > /etc/caddy/health-diary.caddy <<CADDY
 $DOMAIN {
     encode zstd gzip
     reverse_proxy 127.0.0.1:8787
 }
 CADDY
-touch /etc/caddy/Caddyfile
-grep -qF "import /etc/caddy/health-diary.caddy" /etc/caddy/Caddyfile || echo "import /etc/caddy/health-diary.caddy" >> /etc/caddy/Caddyfile
-systemctl reload caddy || systemctl restart caddy
+  touch /etc/caddy/Caddyfile
+  grep -qF "import /etc/caddy/health-diary.caddy" /etc/caddy/Caddyfile || echo "import /etc/caddy/health-diary.caddy" >> /etc/caddy/Caddyfile
+  systemctl reload caddy || systemctl restart caddy
+fi
 
 echo "==> daily backup (03:30, keeps 14 days) -> $BACKUPS"
 mkdir -p "$BACKUPS"; chown postgres:postgres "$BACKUPS"; chmod 700 "$BACKUPS"
