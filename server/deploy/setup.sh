@@ -70,6 +70,7 @@ rsync -a --delete --exclude node_modules --exclude dist --exclude test "$SRC/" "
 cd "$APP"
 npm ci --no-audit --no-fund            # installs dev deps too (needed for tsc/prisma); postinstall runs prisma generate
 npm run build
+[[ -f dist/server.js ]] || { echo "!! build failed: $APP/dist/server.js was not produced (see the tsc output above)"; exit 1; }
 set -a; source "$ENVF"; set +a
 npx prisma migrate deploy
 chown -R root:root "$APP"
@@ -113,10 +114,14 @@ if [[ $USE_NGINX -eq 1 ]]; then
     NGX_LINK=""
   fi
   mkdir -p "$(dirname "$NGX_CONF")"
+  # Match how your other sites listen: if they bind a specific IP (e.g. 1.2.3.4:80), so do we.
+  # Mixing a wildcard "listen 80" with specific-IP listens makes nginx's reload fail with "address already in use".
+  LISTEN_IP="$(nginx -T 2>/dev/null | grep -oE 'listen[[:space:]]+([0-9]{1,3}\.){3}[0-9]{1,3}:80' | head -1 | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' || true)"
+  if [[ -n "$LISTEN_IP" ]]; then LISTEN_LINE="listen $LISTEN_IP:80;"; else LISTEN_LINE="listen 80;"; fi
+  echo "nginx listen directive: $LISTEN_LINE"
   cat > "$NGX_CONF" <<NGINX
 server {
-    listen 80;
-    listen [::]:80;
+    $LISTEN_LINE
     server_name $DOMAIN;
     client_max_body_size 2m;
     location / {
@@ -131,7 +136,12 @@ NGINX
   [[ -z "$NGX_LINK" ]] || ln -sf "$NGX_CONF" "$NGX_LINK"
   echo "nginx config written to $NGX_CONF"
   nginx -t
-  systemctl reload nginx
+  if ! systemctl reload nginx; then echo "!! nginx reload failed; removing our vhost so your other sites stay healthy"; rm -f "$NGX_CONF" "${NGX_LINK:-}"; systemctl reload nginx || true; exit 1; fi
+  sleep 1
+  if ! curl -fsS -m 8 --resolve "$DOMAIN:80:${LISTEN_IP:-127.0.0.1}" "http://$DOMAIN/health" >/dev/null; then
+    echo "!! the API is not answering through nginx yet (is health-diary running?  journalctl -u health-diary -n 30)"; exit 1
+  fi
+  echo "nginx -> API: OK"
   CB=(--nginx -d "$DOMAIN" --non-interactive --agree-tos --redirect)
   if [[ -n "${CERTBOT_EMAIL:-}" ]]; then CB+=(-m "$CERTBOT_EMAIL"); else CB+=(--register-unsafely-without-email); fi
   if ! certbot "${CB[@]}"; then
