@@ -33,7 +33,7 @@ flutter run --dart-define=GOOGLE_SERVER_CLIENT_ID=<web client id>.apps.googleuse
 
 GitHub → **Actions → Build Android APK → Run workflow**। শেষে "health-diary-apk" ডাউনলোড করে ফোনে ইনস্টল করুন।
 
-- Repository **Variables**-এ `GOOGLE_SERVER_CLIENT_ID` রাখুন (Web client ID)।
+- Web client ID অ্যাপের কোডে ডিফল্ট হিসেবে বসানো আছে (এটা গোপন কিছু না)।
 - Google লগইন কাজ করার জন্য অ্যাপ সবসময় **একই চাবিতে** সাইন হতে হবে। একবার চাবি বানান (নিজের কম্পিউটারে/VPS-এ):
   `keytool -genkeypair -v -keystore release.jks -alias healthdiary -keyalg RSA -keysize 2048 -validity 10000`
   তারপর Repository **Secrets**-এ দিন: `ANDROID_KEYSTORE_BASE64` (`base64 -w0 release.jks`), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`।
