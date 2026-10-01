@@ -13,6 +13,23 @@ DOMAIN="${1:-}"; CLIENT_ID="${2:-}"; FIREWALL="${3:-}"
 [[ -n "$DOMAIN" && -n "$CLIENT_ID" ]] || { echo "usage: sudo bash $0 <domain> <google-web-client-id> [--firewall]"; exit 1; }
 [[ $EUID -eq 0 ]] || { echo "run with sudo"; exit 1; }
 
+# On any failure, print everything needed to diagnose it in one go (nothing secret in here).
+diagnose() {
+  echo; echo "================ DIAGNOSTICS (copy everything from here) ================"
+  echo "--- health-diary service:"; systemctl is-active health-diary || true
+  journalctl -u health-diary -n 25 --no-pager 2>/dev/null || true
+  echo "--- build output:"; ls -la /opt/health-diary/dist 2>&1 | head -8
+  echo "--- nginx:"; nginx -t 2>&1 | tail -4; systemctl is-active nginx || true
+  echo "--- local API:"; curl -sS -m 5 http://127.0.0.1:8787/health 2>&1 || true
+  echo "--- vhost files:"; ls /etc/nginx/conf.d/health-diary.conf /etc/nginx/sites-enabled/health-diary 2>&1 | head -3
+  echo "--- certbot log tail:"; tail -n 12 /var/log/letsencrypt/letsencrypt.log 2>/dev/null || true
+  echo "================ END DIAGNOSTICS ================"
+}
+trap 'diagnose' ERR
+
+# Clean up leftovers from earlier failed attempts (only our own files).
+rm -f /etc/nginx/conf.d/health-diary.conf /etc/nginx/sites-enabled/health-diary /etc/nginx/sites-available/health-diary 2>/dev/null || true
+
 SRC="$(cd "$(dirname "$0")/.." && pwd)"
 APP=/opt/health-diary
 BACKUPS=/var/backups/health-diary
@@ -70,7 +87,7 @@ rsync -a --delete --exclude node_modules --exclude dist --exclude test "$SRC/" "
 cd "$APP"
 npm ci --no-audit --no-fund            # installs dev deps too (needed for tsc/prisma); postinstall runs prisma generate
 npm run build
-[[ -f dist/server.js ]] || { echo "!! build failed: $APP/dist/server.js was not produced (see the tsc output above)"; exit 1; }
+[[ -f dist/server.js ]] || { echo "!! build failed: $APP/dist/server.js was not produced (see the tsc output above)"; false; }
 set -a; source "$ENVF"; set +a
 npx prisma migrate deploy
 chown -R root:root "$APP"
@@ -136,10 +153,10 @@ NGINX
   [[ -z "$NGX_LINK" ]] || ln -sf "$NGX_CONF" "$NGX_LINK"
   echo "nginx config written to $NGX_CONF"
   nginx -t
-  if ! systemctl reload nginx; then echo "!! nginx reload failed; removing our vhost so your other sites stay healthy"; rm -f "$NGX_CONF" "${NGX_LINK:-}"; systemctl reload nginx || true; exit 1; fi
+  if ! systemctl reload nginx; then echo "!! nginx reload failed; removing our vhost so your other sites stay healthy"; rm -f "$NGX_CONF" "${NGX_LINK:-}"; systemctl reload nginx || true; false; fi
   sleep 1
   if ! curl -fsS -m 8 --resolve "$DOMAIN:80:${LISTEN_IP:-127.0.0.1}" "http://$DOMAIN/health" >/dev/null; then
-    echo "!! the API is not answering through nginx yet (is health-diary running?  journalctl -u health-diary -n 30)"; exit 1
+    echo "!! the API is not answering through nginx yet (is health-diary running?  journalctl -u health-diary -n 30)"; false
   fi
   echo "nginx -> API: OK"
   CB=(--nginx -d "$DOMAIN" --non-interactive --agree-tos --redirect)
