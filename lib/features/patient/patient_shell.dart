@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../services/backup_service.dart';
 import 'reminder_check_page.dart';
 import '../../services/prefs.dart';
 import '../../core/widgets.dart';
@@ -23,6 +24,7 @@ class _PatientShellState extends State<PatientShell> {
   void initState() {
     super.initState();
     NotificationService.instance.requestPermission();
+    BackupService.instance.autoOnStart();
     // First time only: walk the person through the reminder settings (home keeps a warning card afterwards).
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (Prefs.reminderWizardSeen || !mounted) return;

@@ -5,6 +5,7 @@ import '../data/local_db.dart';
 import '../data/models.dart';
 import 'auth_service.dart';
 import 'notification_service.dart';
+import 'backup_service.dart';
 import 'prefs.dart';
 
 enum Stage { loading, onboarding, login, patientSetup, ownerSetup, patient, owner }
@@ -131,6 +132,7 @@ class AppState extends ChangeNotifier {
     await reloadMembers();
     notifyListeners();
     NotificationService.instance.rescheduleAll();
+    BackupService.instance.scheduleAuto();
   }
 
   void selectMember(Member m) {
@@ -143,6 +145,7 @@ class AppState extends ChangeNotifier {
   void touch() {
     notifyListeners();
     NotificationService.instance.rescheduleAll();
+    BackupService.instance.scheduleAuto();
   }
 
   Future<void> signOut() async {

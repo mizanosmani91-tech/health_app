@@ -8,6 +8,7 @@ import '../../data/local_db.dart';
 import '../../data/models.dart';
 import '../../services/app_state.dart';
 import '../../services/prefs.dart';
+import '../../services/backup_service.dart';
 import '../../services/notification_service.dart';
 import 'medicine_form.dart';
 import 'reminder_check_page.dart';
@@ -111,6 +112,7 @@ class HomePage extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
             child: Column(children: [
+              const _BackupWarning(),
               const _ReminderWarning(),
               for (final x in pending.take(3))
                 Card2(
@@ -270,4 +272,51 @@ class _ReminderWarning extends StatelessWidget {
           );
         },
       );
+}
+
+/// Health data lives on this phone. Until Drive backup is on, a lost or reset phone means lost records.
+class _BackupWarning extends StatefulWidget {
+  const _BackupWarning();
+  @override
+  State<_BackupWarning> createState() => _BackupWarningState();
+}
+
+class _BackupWarningState extends State<_BackupWarning> {
+  bool _busy = false;
+
+  Future<void> _on() async {
+    setState(() => _busy = true);
+    try {
+      // A reinstall must not silently bury the old backup under a new, nearly empty one.
+      if (await BackupService.instance.hasBackup() && mounted && await confirm(context, 'আপনার Google Drive-এ আগের ব্যাকআপ আছে। সেটা এই ফোনে ফিরিয়ে আনবেন? ("না" চাপলে এই ফোনের তথ্য দিয়ে নতুন ব্যাকআপ হবে।)', yes: 'ফিরিয়ে আনুন')) {
+        await BackupService.instance.restoreLatest();
+        if (mounted) await context.read<AppState>().refresh();
+        Prefs.driveLinked = true;
+        if (mounted) context.toast('আগের তথ্য ফিরে এসেছে');
+        return;
+      }
+      await BackupService.instance.backupNow();
+      if (mounted) context.toast('ব্যাকআপ চালু হয়েছে। এখন থেকে নিজে নিজে হবে।');
+    } catch (e) {
+      if (mounted) context.toast('ব্যাকআপ হয়নি: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (Prefs.driveLinked || context.read<AppState>().offline) return const SizedBox.shrink();
+    return Card2(
+      color: const Color(0xFFFFE4E4),
+      margin: const EdgeInsets.only(bottom: 12),
+      onTap: _busy ? null : _on,
+      child: Row(children: [
+        const Icon(Icons.cloud_off, color: Color(0xFFB42318)),
+        const SizedBox(width: 10),
+        const Expanded(child: Text('আপনার তথ্য শুধু এই ফোনে আছে। ফোন হারালে বা অ্যাপ মুছলে সব যাবে। এখানে চেপে Google Drive ব্যাকআপ চালু করুন।', style: TextStyle(height: 1.4, fontWeight: FontWeight.w500))),
+        if (_busy) const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+      ]),
+    );
+  }
 }

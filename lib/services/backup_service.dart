@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -20,7 +21,9 @@ class BackupService {
 
   Future<Map<String, String>> _headers({bool interactive = true}) async {
     final gs = GoogleSignIn.instance;
-    final account = await gs.attemptLightweightAuthentication() ?? await gs.authenticate();
+    final light = await gs.attemptLightweightAuthentication();
+    if (light == null && !interactive) throw StateError('Google সাইন-ইন লাগবে');
+    final account = light ?? await gs.authenticate();
     final client = account.authorizationClient;
     final auth = await client.authorizationForScopes([_scope]) ??
         (interactive ? await client.authorizeScopes([_scope]) : null);
@@ -70,8 +73,8 @@ class BackupService {
     }
   }
 
-  Future<void> backupNow() async {
-    final h = await _headers();
+  Future<void> backupNow({bool silent = false}) async {
+    final h = await _headers(interactive: !silent);
     final data = await LocalDb.instance.dump();
     final existing = await _list(h);
     final have = existing.map((f) => f['name'] as String).toSet();
@@ -92,6 +95,42 @@ class BackupService {
     }
     Prefs.driveLinked = true;
     Prefs.lastBackupMs = DateTime.now().millisecondsSinceEpoch;
+  }
+
+  /// True if this Google account already has a backup in Drive (e.g. from a previous install).
+  Future<bool> hasBackup() async {
+    final h = await _headers();
+    return (await _list(h)).any((f) => (f['name'] as String).startsWith('backup_'));
+  }
+
+  Timer? _timer;
+  bool _running = false;
+
+  /// Called after every data change: waits a little (so a burst of edits is one backup), then backs up in the
+  /// background. Silent: never opens a sign-in or permission screen, and quietly retries on the next change/open.
+  void scheduleAuto() {
+    if (!Prefs.driveLinked) return;
+    _timer?.cancel();
+    _timer = Timer(const Duration(seconds: 45), _auto);
+  }
+
+  /// On app start: if linked and the last backup is over a day old, back up now.
+  Future<void> autoOnStart() async {
+    if (!Prefs.driveLinked) return;
+    final last = Prefs.lastBackupMs ?? 0;
+    if (DateTime.now().millisecondsSinceEpoch - last > const Duration(hours: 20).inMilliseconds) await _auto();
+  }
+
+  Future<void> _auto() async {
+    if (_running) return;
+    _running = true;
+    try {
+      await backupNow(silent: true);
+    } catch (_) {
+      // offline / token expired: tried again at the next change or app start
+    } finally {
+      _running = false;
+    }
   }
 
   /// Restores the newest backup. Returns false when none exists.
