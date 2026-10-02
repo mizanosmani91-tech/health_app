@@ -192,3 +192,12 @@ model CatalogOverride {
   manufacturer String?
   updatedAt    DateTime @updatedAt
 }
+
+/// Per-user daily counter that caps paid prescription-reading calls. Holds no health data.
+model ScanUsage {
+  userId String
+  day    String
+  count  Int    @default(0)
+
+  @@id([userId, day])
+}

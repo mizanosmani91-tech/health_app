@@ -273,3 +273,46 @@ test('input validation and size limits', async () => {
   const res = await fetch(`${base}/stock`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${owner}` }, body: '{bad' });
   assert.equal(res.status, 400);
 });
+
+test('prescription parse: consent, draft sanitising, daily cap, no model configured', async () => {
+  const fake = async () => ({
+    readable: true, doctorName: ' Dr X ', problem: 'দাঁতে ব্যথা', visitDate: '2026-13-99x', nextVisitDate: '2026-10-20',
+    medicines: [
+      { name: 'Napa 500', strength: '500mg', form: 'tablet', morning: 1, noon: 0, night: 1, meal: 'after' as const, days: 5, note: null, uncertain: false },
+      { name: 'Mystery', strength: null, form: null, morning: 1, noon: null, night: 1, meal: null, days: 9999, note: null, uncertain: false },
+      { name: '  ', strength: null, form: null, morning: 1, noon: 1, night: 1, meal: null, days: 3, note: null, uncertain: false },
+    ],
+    tests: [{ name: 'OPG', uncertain: false }], advice: null,
+  });
+  const app = createApp({ db: prisma, verifyGoogle, jwtSecret: 'x'.repeat(40), readPrescription: fake, scanDailyLimit: 2 });
+  const srv = await new Promise<Server>((r) => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
+  const url = `http://127.0.0.1:${(srv.address() as AddressInfo).port}`;
+  try {
+    const lg = async (sub: string) => (await (await fetch(`${url}/auth/google`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ idToken: `good:${sub}:${sub}` }) })).json() as any).token as string;
+    const tok = await lg('scanner1');
+    const post = async (body: unknown, token = tok) => {
+      const r = await fetch(`${url}/prescriptions/parse`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+      return { status: r.status, json: await r.json() as any };
+    };
+    const img = Buffer.alloc(300, 7).toString('base64');
+    assert.equal((await post({ mediaType: 'image/jpeg', image: img })).status, 400); // no consent
+    assert.equal((await post({ consent: true, mediaType: 'image/gif', image: img })).status, 400);
+    const ok = await post({ consent: true, mediaType: 'image/jpeg', image: img });
+    assert.equal(ok.status, 200);
+    const d = ok.json.draft;
+    assert.equal(d.visitDate, null);                       // invalid date blanked
+    assert.equal(d.medicines.length, 2);                   // nameless row dropped
+    assert.equal(d.medicines[0].uncertain, false);         // fully read row stays confirmed-able
+    assert.equal(d.medicines[1].uncertain, true);          // missing noon dose + absurd days -> must be confirmed
+    assert.equal(d.medicines[1].days, null);
+    assert.equal(ok.json.remainingToday, 1);
+    assert.equal((await post({ consent: true, mediaType: 'image/png', image: img })).status, 200);
+    assert.equal((await post({ consent: true, mediaType: 'image/png', image: img })).status, 429); // cap of 2
+    const no = await fetch(`${url}/prescriptions/parse`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+    assert.equal(no.status, 401);
+  } finally { srv.close(); }
+  // server without an API key configured
+  const t2 = (await (await fetch(`${base}/auth/google`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ idToken: 'good:scanner2:scanner2' }) })).json() as any).token;
+  const r = await call('POST', '/prescriptions/parse', { token: t2, body: { consent: true, mediaType: 'image/jpeg', image: Buffer.alloc(300, 7).toString('base64') } });
+  assert.equal(r.status, 503);
+});

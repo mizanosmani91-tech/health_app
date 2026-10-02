@@ -12,6 +12,8 @@ import { pharmacyRoutes } from './routes/pharmacy.routes';
 import { requestRoutes } from './routes/requests.routes';
 import { bookRoutes } from './routes/books.routes';
 import { adminRoutes } from './routes/admin.routes';
+import { prescriptionRoutes } from './routes/prescription.routes';
+import type { ReadPrescription } from './prescription';
 
 export interface AppDeps {
   db: Db;
@@ -19,9 +21,11 @@ export interface AppDeps {
   jwtSecret: string;
   adminKey?: string;
   log?: boolean;
+  readPrescription?: ReadPrescription;
+  scanDailyLimit?: number;
 }
 
-export function createApp({ db, verifyGoogle, jwtSecret, adminKey, log }: AppDeps) {
+export function createApp({ db, verifyGoogle, jwtSecret, adminKey, log, readPrescription, scanDailyLimit }: AppDeps) {
   if (!jwtSecret || jwtSecret.length < 32) throw new Error('JWT_SECRET must be at least 32 characters');
   if (adminKey && adminKey.length < 16) throw new Error('ADMIN_KEY must be at least 16 characters');
   const key = new TextEncoder().encode(jwtSecret);
@@ -43,6 +47,7 @@ export function createApp({ db, verifyGoogle, jwtSecret, adminKey, log }: AppDep
   pharmacyRoutes(app, { db, authed });
   requestRoutes(app, { db, authed });
   bookRoutes(app, { db, authed });
+  prescriptionRoutes(app, { db, authed, read: readPrescription, dailyLimit: scanDailyLimit ?? 10 });
   if (adminKey) adminRoutes(app, { db, adminKey });
 
   app.use((_req, _res, next) => next(new HttpError(404, 'not found')));

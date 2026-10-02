@@ -12,6 +12,7 @@
     "test": "bash scripts/test.sh"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
     "@prisma/client": "^5.19.1",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
