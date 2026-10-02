@@ -4,6 +4,7 @@
 # Keeps a persistent git checkout in /opt/health-diary-src, builds in /opt/health-diary, applies new
 # migrations, restarts the service and checks /health. Secrets (/etc/health-diary.env) and data are untouched.
 set -euo pipefail
+umask 022   # root's umask may be strict; the service user (hd) must be able to read dist/ and node_modules/
 [[ $EUID -eq 0 ]] || { echo "run with sudo"; exit 1; }
 
 REPO="${REPO:-https://github.com/mizanosmani91-tech/health_app}"
@@ -30,6 +31,7 @@ npm run build
 set -a; source "$ENVF"; set +a
 npx prisma migrate deploy
 chown -R root:root "$APP"
+chmod -R go+rX "$APP"   # readable by the unprivileged service user
 
 echo "==> restarting"
 systemctl restart health-diary

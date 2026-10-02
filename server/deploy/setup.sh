@@ -91,6 +91,7 @@ npm run build
 set -a; source "$ENVF"; set +a
 npx prisma migrate deploy
 chown -R root:root "$APP"
+chmod -R go+rX "$APP"
 
 echo "==> systemd service"
 cat > /etc/systemd/system/health-diary.service <<UNIT
