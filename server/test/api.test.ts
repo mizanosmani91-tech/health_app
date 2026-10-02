@@ -177,6 +177,64 @@ test('barcode: look up by scanned code, unique per pharmacy, owner-only', async 
   assert.ok(!JSON.stringify((await call('POST', '/search', { token: pat, body: { names: ['Ace'] } })).json).includes('8940001285711'));
 });
 
+test('shared catalog: consensus from pharmacies, verified-only, identity only, admin override', async () => {
+  const BC = '8940001999990';
+  async function verifiedShop(sub: string, name: string) {
+    const t = await login(sub, 'owner');
+    const r = await call('POST', '/pharmacy', { token: t, body: shop(name) });
+    await call('POST', `/admin/pharmacies/${r.json.id}/status`, { admin: ADMIN, body: { status: 'verified' } });
+    return { t, id: r.json.id as string };
+  }
+  const a = await verifiedShop('cat-a', 'CatA');
+  const b = await verifiedShop('cat-b', 'CatB');
+  const c = await verifiedShop('cat-c', 'CatC');
+  assert.equal((await call('GET', `/catalog/${BC}`, { token: a.t })).status, 404);
+
+  // A names it; B reads A's suggestion (without learning who wrote it or any price)
+  await call('POST', '/stock', { token: a.t, body: { name: 'Ace Plus', genericName: 'Paracetamol', form: 'Tablet', manufacturer: 'Square', barcode: BC, buyPrice: 5, sellPrice: 6 } });
+  const hit = await call('GET', `/catalog/${BC}`, { token: b.t });
+  assert.equal(hit.status, 200);
+  assert.equal(hit.json.name, 'Ace Plus');
+  assert.equal(hit.json.manufacturer, 'Square');
+  assert.equal(hit.json.confirmations, 1);
+  assert.ok(!/buyPrice|sellPrice|pharmacyId|CatA|\b5\b|\b6\b/.test(JSON.stringify(hit.json)), 'catalog must not leak prices or who wrote it');
+
+  // B disagrees, C agrees with A (case/space-insensitive) -> A's name wins with 2 confirmations
+  await call('POST', '/stock', { token: b.t, body: { name: 'Wrong name', barcode: BC } });
+  await call('POST', '/stock', { token: c.t, body: { name: '  ace   PLUS ', barcode: BC } });
+  const win = await call('GET', `/catalog/${BC}`, { token: a.t });
+  assert.equal(win.json.confirmations, 2);
+  assert.equal(win.json.name.trim().toLowerCase().replace(/\s+/g, ' '), 'ace plus');
+
+  // editing your own entry updates it instead of adding a vote
+  const mine = (await call('GET', `/stock/barcode/${BC}`, { token: b.t })).json;
+  await call('PATCH', `/stock/${mine.id}`, { token: b.t, body: { name: 'Ace Plus' } });
+  assert.equal((await call('GET', `/catalog/${BC}`, { token: a.t })).json.confirmations, 3);
+
+  // unverified (pending) shops can read but never contribute
+  const p = await login('cat-pending', 'owner');
+  await call('POST', '/pharmacy', { token: p, body: shop('Pending') });
+  assert.equal((await call('GET', `/catalog/${BC}`, { token: p })).status, 200);
+  await call('POST', '/stock', { token: p, body: { name: 'Spam', barcode: '8940001999991' } });
+  assert.equal((await call('GET', '/catalog/8940001999991', { token: a.t })).status, 404);
+
+  // patients have no pharmacy, so no catalog access; bad barcode rejected
+  const pat = await login('cat-pat', 'patient');
+  assert.equal((await call('GET', `/catalog/${BC}`, { token: pat })).status, 404);
+  assert.equal((await call('GET', '/catalog/abc', { token: a.t })).status, 400);
+
+  // admin sees all entries and can pin a corrected name that overrides consensus
+  assert.equal((await call('GET', `/admin/catalog/${BC}`, {})).status, 401);
+  const view = await call('GET', `/admin/catalog/${BC}`, { admin: ADMIN });
+  assert.equal(view.json.entries.length, 3);
+  assert.equal((await call('PUT', `/admin/catalog/${BC}`, { admin: ADMIN, body: { name: 'Ace Plus 500 mg', form: 'Tablet' } })).status, 200);
+  const pinned = await call('GET', `/catalog/${BC}`, { token: c.t });
+  assert.equal(pinned.json.name, 'Ace Plus 500 mg');
+  assert.equal(pinned.json.source, 'admin');
+  assert.equal((await call('DELETE', `/admin/catalog/${BC}`, { admin: ADMIN })).status, 204);
+  assert.equal((await call('GET', `/catalog/${BC}`, { token: c.t })).json.source, 'pharmacies');
+});
+
 test('khata payments are atomic, guarded, and mirror into the ledger', async () => {
   const owner = await login('owner3', 'owner');
   await call('POST', '/pharmacy', { token: owner, body: shop('C') });

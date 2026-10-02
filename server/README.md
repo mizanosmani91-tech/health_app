@@ -36,3 +36,14 @@ curl -X POST -H "x-admin-key: $KEY" -H 'content-type: application/json' -d '{"st
 - Backups: `/var/backups/health-diary` (14 days, `pg_restore`-able). **Copy them off the server** — a VPS disk failure otherwise loses everything.
 - Update: `git pull && sudo bash server/deploy/setup.sh DOMAIN CLIENT_ID` (rebuilds, runs new migrations, keeps secrets and data).
 - Logs: `journalctl -u health-diary -f`
+
+## Shared medicine catalog
+Verified pharmacies that save a stock item with a barcode contribute its identity (name / generic / form / maker) to a shared catalog.
+Other pharmacies scanning the same barcode get it pre-filled (`GET /catalog/:barcode`). Prices, quantities and which shop stocks what are never shared.
+The shown name is the one most distinct pharmacies agree on. To correct a bad entry:
+```sh
+KEY=$(sudo grep ADMIN_KEY /etc/health-diary.env | cut -d= -f2)
+curl -H "x-admin-key: $KEY" https://DOMAIN/admin/catalog/8940001285711                     # what pharmacies wrote
+curl -X PUT -H "x-admin-key: $KEY" -H 'content-type: application/json' -d '{"name":"Ace Plus 500 mg","genericName":"Paracetamol","form":"Tablet","manufacturer":"Square"}' https://DOMAIN/admin/catalog/8940001285711   # pin a corrected entry
+curl -X DELETE -H "x-admin-key: $KEY" https://DOMAIN/admin/catalog/8940001285711           # remove the pin
+```

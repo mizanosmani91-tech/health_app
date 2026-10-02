@@ -2,7 +2,8 @@ import { Express, NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
 import { PharmacyStatus } from '@prisma/client';
 import { Db } from '../prisma';
-import { HttpError, parse, safeEqual, simpleLimit } from '../http';
+import { HttpError, optText, parse, safeEqual, simpleLimit, text } from '../http';
+import { lookupCatalog } from '../catalog';
 
 /** Manual pharmacy verification. Only mounted when ADMIN_KEY is configured. */
 export function adminRoutes(app: Express, d: { db: Db; adminKey: string }) {
@@ -27,5 +28,24 @@ export function adminRoutes(app: Express, d: { db: Db; adminKey: string }) {
     const r = await d.db.pharmacy.updateMany({ where: { id: req.params.id }, data: { status } });
     if (!r.count) throw new HttpError(404, 'not found');
     res.json({ ok: true });
+  });
+
+  // Catalog moderation: see what pharmacies wrote for a barcode, and pin a corrected name.
+  const code = z.string().regex(/^\d{8,14}$/);
+  app.get('/admin/catalog/:code', lim, guard, async (req, res) => {
+    const barcode = parse(code, req.params.code);
+    const entries = await d.db.catalogEntry.findMany({ where: { barcode }, orderBy: { updatedAt: 'desc' } });
+    res.json({ consensus: await lookupCatalog(d.db, barcode), entries: entries.map((e) => ({ pharmacyId: e.pharmacyId, name: e.name, genericName: e.genericName, form: e.form, manufacturer: e.manufacturer })) });
+  });
+  app.put('/admin/catalog/:code', lim, guard, async (req, res) => {
+    const barcode = parse(code, req.params.code);
+    const b = parse(z.object({ name: text(160), genericName: optText(160), form: optText(40), manufacturer: optText(120) }), req.body);
+    const data = { name: b.name, genericName: b.genericName ?? null, form: b.form ?? null, manufacturer: b.manufacturer ?? null };
+    await d.db.catalogOverride.upsert({ where: { barcode }, update: data, create: { barcode, ...data } });
+    res.json({ ok: true });
+  });
+  app.delete('/admin/catalog/:code', lim, guard, async (req, res) => {
+    await d.db.catalogOverride.deleteMany({ where: { barcode: parse(code, req.params.code) } });
+    res.status(204).end();
   });
 }

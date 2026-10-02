@@ -39,9 +39,18 @@ class _StockPageState extends State<StockPage> {
         if (context.mounted) context.toast('$e');
         return;
       }
+      // Not in our own list: ask the shared catalog (what other pharmacies named this pack).
+      Map<String, dynamic>? suggestion;
+      try {
+        suggestion = await o.api.get('/catalog/$code') as Map<String, dynamic>;
+      } on ApiException catch (_) {
+        suggestion = null; // nobody has named it yet (or offline): fall through to a blank form
+      }
       if (context.mounted) {
-        context.toast('নতুন ওষুধ। নাম লিখে সংরক্ষণ করুন, পরের বার স্ক্যান করলেই সব ভরবে।');
-        await context.push(StockFormPage(barcode: code));
+        context.toast(suggestion == null
+            ? 'নতুন ওষুধ। নাম লিখে সংরক্ষণ করুন, পরের বার স্ক্যান করলেই সব ভরবে।'
+            : 'অন্য ফার্মেসির তথ্য থেকে ভরা হয়েছে, ঠিক আছে কি না দেখে নিন।');
+        await context.push(StockFormPage(barcode: code, suggestion: suggestion));
       }
     }
   }
@@ -148,7 +157,8 @@ class _StockPageState extends State<StockPage> {
 class StockFormPage extends StatefulWidget {
   final Map<String, dynamic>? item;
   final String? barcode;
-  const StockFormPage({super.key, this.item, this.barcode});
+  final Map<String, dynamic>? suggestion; // from the shared catalog (name / genericName / form / manufacturer)
+  const StockFormPage({super.key, this.item, this.barcode, this.suggestion});
   @override
   State<StockFormPage> createState() => _StockFormPageState();
 }
@@ -156,15 +166,16 @@ class StockFormPage extends StatefulWidget {
 class _StockFormPageState extends State<StockFormPage> {
   final _key = GlobalKey<FormState>();
   late final i = widget.item;
-  late final _name = TextEditingController(text: i?['name']);
-  late final _generic = TextEditingController(text: i?['genericName']);
+  late final _name = TextEditingController(text: i?['name'] ?? widget.suggestion?['name']);
+  late final _generic = TextEditingController(text: i?['genericName'] ?? widget.suggestion?['genericName']);
+  late final _maker = TextEditingController(text: i?['manufacturer'] ?? widget.suggestion?['manufacturer']);
   late final _qty = TextEditingController(text: i?['qty'] == null ? '' : bn(i!['qty']));
   late final _unit = TextEditingController(text: i?['unit'] ?? 'পাতা');
   late final _buy = TextEditingController(text: i?['buyPrice'] == null ? '' : bn(i!['buyPrice']));
   late final _sell = TextEditingController(text: i?['sellPrice'] == null ? '' : bn(i!['sellPrice']));
   late final _batch = TextEditingController(text: i?['batchNo']);
   late final _barcode = TextEditingController(text: i?['barcode'] ?? widget.barcode);
-  late String _form = i?['form'] ?? 'ট্যাবলেট';
+  late String _form = i?['form'] ?? widget.suggestion?['form'] ?? 'ট্যাবলেট';
   late String _status = i?['status'] ?? 'in';
   late final _expiry = TextEditingController(text: i?['expiry'] == null ? '' : bn((i!['expiry'] as String).substring(0, 7).split('-').reversed.join('/')));
   List<CatalogItem> _hits = [];
@@ -190,7 +201,7 @@ class _StockFormPageState extends State<StockFormPage> {
     final data = {
       'name': _name.text.trim(),
       'genericName': _generic.text.trim().isEmpty ? null : _generic.text.trim(),
-      'form': _form, 'qty': _num(_qty), 'unit': _unit.text.trim(), 'buyPrice': _num(_buy), 'sellPrice': _num(_sell),
+      'form': _form, 'manufacturer': _maker.text.trim().isEmpty ? null : _maker.text.trim(), 'qty': _num(_qty), 'unit': _unit.text.trim(), 'buyPrice': _num(_buy), 'sellPrice': _num(_sell),
       'expiry': _parseExpiry(), 'batchNo': _batch.text.trim().isEmpty ? null : _batch.text.trim(),
       'barcode': _barcode.text.trim().isEmpty ? null : en(_barcode.text.trim()), 'status': _status,
     };
@@ -243,7 +254,21 @@ class _StockFormPageState extends State<StockFormPage> {
               ),
             ),
           ]),
+          if (widget.suggestion != null && i == null)
+            Card2(
+              color: context.pal.soft,
+              margin: const EdgeInsets.only(bottom: 12),
+              child: Row(children: [
+                Icon(Icons.groups, color: context.pal.primaryDark), const SizedBox(width: 10),
+                Expanded(child: Text(
+                  widget.suggestion!['source'] == 'admin'
+                      ? 'যাচাই করা তথ্য থেকে ভরা হয়েছে। ঠিক থাকলে সংরক্ষণ করুন।'
+                      : '${bn(widget.suggestion!['confirmations'] ?? 1)} ফার্মেসি এভাবে লিখেছে। ঠিক থাকলে সংরক্ষণ করুন, না হলে বদলে নিন।',
+                  style: const TextStyle(fontSize: 13, height: 1.5))),
+              ]),
+            ),
           Field('জেনেরিক নাম (ঐচ্ছিক)', controller: _generic, icon: Icons.science),
+          Field('কোম্পানি (ঐচ্ছিক)', controller: _maker, icon: Icons.factory),
           const Padding(padding: EdgeInsets.only(left: 4, bottom: 8), child: Text('ধরন', style: TextStyle(fontWeight: FontWeight.w500))),
           Wrap(spacing: 8, runSpacing: 8, children: [
             for (final f in ['ট্যাবলেট', 'সিরাপ', 'ক্যাপসুল', 'ইনজেকশন', 'অন্যান্য']) Chip2(f, selected: _form == f, onTap: () => setState(() => _form = f)),

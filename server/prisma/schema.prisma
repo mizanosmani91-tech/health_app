@@ -73,6 +73,7 @@ model Pharmacy {
   createdAt  DateTime       @default(now())
   license    LicensePhoto?
   stock      StockItem[]
+  catalog    CatalogEntry[]
   requests   MedRequest[]
   ledger     LedgerEntry[]
   khata      KhataEntry[]
@@ -101,6 +102,7 @@ model StockItem {
   sellPrice   Decimal?    @db.Decimal(12, 2)
   expiry      String?     // YYYY-MM-DD
   batchNo     String?
+  manufacturer String?
   barcode     String?     // EAN-13 / GTIN printed on the pack; the pharmacy's own product list is built from these
   status      StockStatus @default(in)
   updatedAt   DateTime    @updatedAt
@@ -162,4 +164,31 @@ model KhataEntry {
   createdAt  DateTime       @default(now())
 
   @@index([pharmacyId, direction])
+}
+
+// Shared product catalog, built by pharmacies as they scan packs. Holds identity only
+// (name / generic / form / maker) — never prices, quantities or which shop stocks what.
+// One row per (barcode, pharmacy); the "consensus" name is the one most distinct pharmacies agree on.
+model CatalogEntry {
+  barcode      String
+  pharmacyId   String
+  pharmacy     Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  name         String
+  genericName  String?
+  form         String?
+  manufacturer String?
+  updatedAt    DateTime @updatedAt
+
+  @@id([barcode, pharmacyId])
+  @@index([barcode])
+}
+
+// Admin-corrected entry; wins over the consensus.
+model CatalogOverride {
+  barcode      String   @id
+  name         String
+  genericName  String?
+  form         String?
+  manufacturer String?
+  updatedAt    DateTime @updatedAt
 }

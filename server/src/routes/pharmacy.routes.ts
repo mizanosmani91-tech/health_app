@@ -2,6 +2,7 @@ import { Express, Request } from 'express';
 import { z } from 'zod';
 import { Pharmacy, StockItem, StockStatus } from '@prisma/client';
 import { Db } from '../prisma';
+import { contribute, lookupCatalog } from '../catalog';
 import { HttpError, day, hhmm, n, optMoney, optText, parse, simpleLimit, text } from '../http';
 
 const pharmacyJson = (p: Pharmacy) => ({
@@ -12,7 +13,7 @@ const pharmacyJson = (p: Pharmacy) => ({
 
 const stockJson = (s: StockItem) => ({
   id: s.id, name: s.name, genericName: s.genericName, form: s.form, qty: n(s.qty), unit: s.unit,
-  buyPrice: n(s.buyPrice), sellPrice: n(s.sellPrice), expiry: s.expiry, batchNo: s.batchNo, barcode: s.barcode,
+  buyPrice: n(s.buyPrice), sellPrice: n(s.sellPrice), expiry: s.expiry, batchNo: s.batchNo, manufacturer: s.manufacturer, barcode: s.barcode,
   status: s.status, updatedAt: s.updatedAt,
 });
 
@@ -26,6 +27,7 @@ const stockBody = z.object({
   sellPrice: optMoney,
   expiry: day.nullable().optional(),
   batchNo: optText(60),
+  manufacturer: optText(120),
   barcode: z.preprocess((v) => (v === '' ? null : v), z.string().regex(/^\d{8,14}$/, 'barcode must be 8-14 digits').nullable().optional()),
   status: z.nativeEnum(StockStatus).default('in'),
 });
@@ -77,6 +79,22 @@ export function pharmacyRoutes(app: Express, d: { db: Db; authed: any }) {
     const p = await mine(req);
     res.json((await db.stockItem.findMany({ where: { pharmacyId: p.id }, orderBy: { name: 'asc' } })).map(stockJson));
   });
+  // A verified pharmacy's scanned products feed the shared catalog (identity only: name/generic/form/maker).
+  const share = async (p: Pharmacy, s: StockItem) => {
+    if (s.barcode && p.status === 'verified') {
+      await contribute(db, p.id, { barcode: s.barcode, name: s.name, genericName: s.genericName, form: s.form, manufacturer: s.manufacturer });
+    }
+  };
+
+  // What do we know about this barcode from other pharmacies? (404 = nobody has named it yet)
+  app.get('/catalog/:code', ...owner, async (req, res) => {
+    await mine(req);
+    if (!/^\d{8,14}$/.test(req.params.code)) throw new HttpError(400, 'barcode must be 8-14 digits');
+    const hit = await lookupCatalog(db, req.params.code);
+    if (!hit) throw new HttpError(404, 'not found');
+    res.json(hit);
+  });
+
   // Look a scanned pack up in this pharmacy's own product list (404 = first time we see it).
   app.get('/stock/barcode/:code', ...owner, async (req, res) => {
     const p = await mine(req);
@@ -88,6 +106,7 @@ export function pharmacyRoutes(app: Express, d: { db: Db; authed: any }) {
   app.post('/stock', ...owner, async (req, res) => {
     const p = await mine(req);
     const s = await db.stockItem.create({ data: { ...parse(stockBody, req.body), pharmacyId: p.id } });
+    await share(p, s);
     res.status(201).json(stockJson(s));
   });
   app.patch('/stock/:id', ...owner, async (req, res) => {
@@ -96,7 +115,9 @@ export function pharmacyRoutes(app: Express, d: { db: Db; authed: any }) {
     if (!Object.keys(data).length) throw new HttpError(400, 'nothing to update');
     const r = await db.stockItem.updateMany({ where: { id: req.params.id, pharmacyId: p.id }, data });
     if (!r.count) throw new HttpError(404, 'not found');
-    res.json(stockJson((await db.stockItem.findUnique({ where: { id: req.params.id } }))!));
+    const s = (await db.stockItem.findUnique({ where: { id: req.params.id } }))!;
+    await share(p, s);
+    res.json(stockJson(s));
   });
   app.delete('/stock/:id', ...owner, async (req, res) => {
     const p = await mine(req);
