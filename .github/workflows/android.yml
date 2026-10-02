@@ -8,41 +8,49 @@ jobs:
   apk:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: '17' }
       - uses: subosito/flutter-action@v2
         with: { channel: stable, cache: true }
 
       # Stable signing key => stable SHA-1 => Google sign-in keeps working across builds.
       # Create once (see README "APK বানানো") and store as repository secrets.
-      - name: Restore release keystore (if configured)
+      - name: Restore and verify release keystore (if configured)
         env:
           KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KSP: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEYALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEYP: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          if [ -n "$KS" ]; then
-            echo "$KS" | base64 -d > android/release.jks
-            cat > android/key.properties <<PROPS
-          storeFile=release.jks
-          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
-          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
-          PROPS
-            echo "Using release keystore"
-          else
+          if [ -z "$KS" ]; then
             echo "No keystore secret: falling back to the debug key (Google sign-in will NOT match your registered SHA-1)"
+            exit 0
           fi
+          # Pasted secrets often carry stray spaces / CR / LF; strip them.
+          clean() { printf '%s' "$1" | tr -d ' \r\n\t'; }
+          KS="$(clean "$KS")"; KSP="$(clean "$KSP")"; KEYALIAS="$(clean "$KEYALIAS")"; KEYP="$(clean "$KEYP")"
+          printf '%s' "$KS" | base64 -d > android/release.jks || { echo "::error::ANDROID_KEYSTORE_BASE64 is not valid base64 (re-copy the whole single line)"; exit 1; }
+          echo "keystore file size: $(stat -c %s android/release.jks) bytes (a normal one is ~2500-3500)"
+          if ! keytool -list -v -keystore android/release.jks -storepass "$KSP" > /tmp/ks.txt 2>/tmp/ks.err; then
+            echo "::error::Cannot open the keystore. Either ANDROID_KEYSTORE_PASSWORD is wrong, or ANDROID_KEYSTORE_BASE64 was truncated/corrupted."
+            cat /tmp/ks.err
+            exit 1
+          fi
+          echo "Aliases in keystore:"; grep -E "^Alias name:" /tmp/ks.txt
+          grep -q "^Alias name: $KEYALIAS\$" /tmp/ks.txt || { echo "::error::ANDROID_KEY_ALIAS does not match any alias above"; exit 1; }
+          echo "Keystore type: $(grep -E '^Keystore type:' /tmp/ks.txt)"
+          echo "SHA-1 (must equal the one registered in Google's Android OAuth client):"
+          grep -E "SHA1:" /tmp/ks.txt | head -1
+          # Same cleaned values go to Gradle.
+          { echo "storeFile=release.jks"; echo "storePassword=$KSP"; echo "keyAlias=$KEYALIAS"; echo "keyPassword=$KEYP"; } > android/key.properties
+          echo "Using release keystore"
 
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
       - name: Build APK
         run: flutter build apk --release
-      - name: Print signing SHA-1 (register this in the Google Android OAuth client)
-        run: |
-          if [ -f android/release.jks ]; then
-            keytool -list -v -keystore android/release.jks -alias "${{ secrets.ANDROID_KEY_ALIAS }}" -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" | grep -E "SHA1|SHA-1"
-          fi
       - uses: actions/upload-artifact@v4
         with:
           name: health-diary-apk
