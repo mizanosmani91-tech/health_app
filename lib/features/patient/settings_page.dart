@@ -159,6 +159,21 @@ class _SettingsPageState extends State<SettingsPage> {
               Text('লগআউট', style: TextStyle(color: Color(0xFFB23E19), fontWeight: FontWeight.w600)),
             ]),
           ),
+          // Deliberately quiet: not a card, not in the way. Only shown to people who don't own a pharmacy yet.
+          if (!s.offline && !s.ownsPharmacy)
+            Padding(
+              padding: const EdgeInsets.only(top: 18),
+              child: Center(
+                child: TextButton(
+                  onPressed: () async {
+                    if (await confirm(context, 'ফার্মেসির মালিক হিসেবে দোকান যোগ করতে চান?', yes: 'হ্যাঁ, দোকান যোগ করব') && context.mounted) {
+                      s.switchRole(UserRole.owner);
+                    }
+                  },
+                  child: Text('ফার্মেসির মালিক? দোকান যোগ করুন', style: TextStyle(color: context.pal.muted, fontSize: 13)),
+                ),
+              ),
+            ),
         ]),
       ),
     ]);
