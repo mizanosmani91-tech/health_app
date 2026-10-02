@@ -11,8 +11,12 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Prefs.init();
   await LocalDb.instance.init();
-  await NotificationService.instance.init();
-  await AuthService.init();
+  try {
+    await NotificationService.instance.init();
+    await AuthService.init();
+  } catch (e) {
+    debugPrint('startup service init failed: $e'); // the app must still open
+  }
   final state = AppState()..start();
   runApp(ChangeNotifierProvider.value(value: state, child: const HealthApp()));
 }

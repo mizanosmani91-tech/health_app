@@ -14,6 +14,7 @@ class NotificationService {
   static final instance = NotificationService._();
   final _plugin = FlutterLocalNotificationsPlugin();
   bool _ready = false;
+  String? initError;
 
   static const _slots = ['morning', 'noon', 'night'];
   static const _slotNames = {'morning': 'সকালের', 'noon': 'দুপুরের', 'night': 'রাতের'};
@@ -28,10 +29,15 @@ class NotificationService {
     } catch (_) {
       tz.setLocalLocation(tz.getLocation('Asia/Dhaka'));
     }
-    await _plugin.initialize(
-      settings: const InitializationSettings(android: AndroidInitializationSettings('ic_stat_notify')),
-    );
-    _ready = true;
+    try {
+      await _plugin.initialize(
+        settings: const InitializationSettings(android: AndroidInitializationSettings('ic_stat_notify')),
+      );
+      _ready = true;
+    } catch (e) {
+      // Never let a reminder problem stop the app from opening; the setup screen shows this reason.
+      initError = '$e';
+    }
   }
 
   Future<bool> requestPermission() async {
@@ -132,12 +138,16 @@ class NotificationService {
   Future<void> askBattery() => Permission.ignoreBatteryOptimizations.request();
 
   /// Shows a notification immediately: proves the permission, channel and icon work (separate from alarms).
-  Future<void> showNow() => _plugin.show(
+  Future<void> showNow() async {
+    if (!_ready) throw StateError('নোটিফিকেশন চালু হয়নি: $initError');
+    await _plugin.show(
         id: 9999998, title: 'পরীক্ষা: নোটিফিকেশন কাজ করছে', body: 'এখন ১ মিনিট পরের রিমাইন্ডারের জন্য অপেক্ষা করুন',
         notificationDetails: _details('doses', 'ওষুধের সময়'));
+  }
 
   /// Fires one real reminder through the same path as dose alarms, [seconds] from now.
   Future<void> sendTest({int seconds = 60}) async {
+    if (!_ready) throw StateError('নোটিফিকেশন চালু হয়নি: $initError');
     _exactOk = await Permission.scheduleExactAlarm.isGranted;
     await _schedule(_Alarm(9999999, DateTime.now().add(Duration(seconds: seconds)), 'পরীক্ষা: রিমাইন্ডার ঠিকমতো কাজ করছে',
         'এভাবেই ওষুধের সময় জানানো হবে', 'doses', 'ওষুধের সময়'));
