@@ -1,4 +1,6 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+import 'package:provider/provider.dart';
+import '../../core/widgets.dart';
 import '../../services/api.dart';
 
 /// Holds the signed-in owner's pharmacy and a version counter that owner
@@ -38,3 +40,8 @@ class OwnerCtx extends ChangeNotifier {
 }
 
 DateTime? ts(dynamic v) => v is String ? DateTime.tryParse(v)?.toLocal() : null;
+
+extension OwnerNav on BuildContext {
+  /// Pushed routes live outside the shell's provider, so hand the owner context to them explicitly.
+  Future<T?> pushOwner<T>(Widget page) => push<T>(ChangeNotifierProvider<OwnerCtx>.value(value: read<OwnerCtx>(), child: page));
+}

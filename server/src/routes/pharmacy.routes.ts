@@ -3,11 +3,13 @@ import { z } from 'zod';
 import { Pharmacy, StockItem, StockStatus } from '@prisma/client';
 import { Db } from '../prisma';
 import { contribute, lookupCatalog } from '../catalog';
+import { openStatus } from '../hours';
 import { HttpError, day, hhmm, n, optMoney, optText, parse, simpleLimit, text } from '../http';
 
 const pharmacyJson = (p: Pharmacy) => ({
   id: p.id, ownerId: p.ownerId, name: p.name, address: p.address, phone: p.phone, licenseNo: p.licenseNo,
-  status: p.status, isOpen: p.isOpen, openFrom: p.openFrom, openTo: p.openTo, weeklyOff: p.weeklyOff,
+  // isOpen = open right now (switch AND hours AND not the weekly off day); manualOpen = the owner's switch
+  status: p.status, isOpen: openStatus(p).open, closedReason: openStatus(p).reason, manualOpen: p.isOpen, openFrom: p.openFrom, openTo: p.openTo, weeklyOff: p.weeklyOff,
   notifyNew: p.notifyNew, createdAt: p.createdAt,
 });
 
@@ -130,7 +132,7 @@ export function pharmacyRoutes(app: Express, d: { db: Db; authed: any }) {
     const { names } = parse(z.object({ names: z.array(text(120)).min(1).max(20) }), req.body);
     const phs = await db.pharmacy.findMany({
       where: { status: 'verified' }, orderBy: { name: 'asc' }, take: 100,
-      select: { id: true, name: true, address: true, phone: true, isOpen: true },
+      select: { id: true, name: true, address: true, phone: true, isOpen: true, openFrom: true, openTo: true, weeklyOff: true },
     });
     const ids = phs.map((p) => p.id);
     const rank: Record<string, number> = { in: 3, low: 2, out: 1 };
@@ -153,7 +155,7 @@ export function pharmacyRoutes(app: Express, d: { db: Db; authed: any }) {
     res.json(
       phs.flatMap((p) =>
         names.map((q) => ({
-          pharmacyId: p.id, pharmacyName: p.name, address: p.address, phone: p.phone, isOpen: p.isOpen,
+          pharmacyId: p.id, pharmacyName: p.name, address: p.address, phone: p.phone, isOpen: openStatus(p).open,
           medicineName: q, status: best.get(`${p.id}|${q}`) ?? 'unknown', updatedAt: updAt.get(p.id) ?? null,
         })),
       ),

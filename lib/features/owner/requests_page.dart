@@ -41,7 +41,7 @@ class _RequestsPageState extends State<RequestsPage> {
           for (final r in rows)
             Card2(
               margin: const EdgeInsets.only(bottom: 10),
-              onTap: () => context.push(RequestDetailPage(id: r['id'])),
+              onTap: () => context.pushOwner(RequestDetailPage(id: r['id'])),
               child: Row(children: [
                 IconTile(Icons.person, Tint.all[(r['patientName'] as String).hashCode.abs() % 6], round: true),
                 const SizedBox(width: 12),

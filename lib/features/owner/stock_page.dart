@@ -32,7 +32,7 @@ class _StockPageState extends State<StockPage> {
       final item = await o.api.get('/stock/barcode/$code') as Map<String, dynamic>;
       if (context.mounted) {
         context.toast('চেনা ওষুধ: ${item['name']}');
-        await context.push(StockFormPage(item: item));
+        await context.pushOwner(StockFormPage(item: item));
       }
     } on ApiException catch (e) {
       if (e.status != 404) {
@@ -50,7 +50,7 @@ class _StockPageState extends State<StockPage> {
         context.toast(suggestion == null
             ? 'নতুন ওষুধ। নাম লিখে সংরক্ষণ করুন, পরের বার স্ক্যান করলেই সব ভরবে।'
             : 'অন্য ফার্মেসির তথ্য থেকে ভরা হয়েছে, ঠিক আছে কি না দেখে নিন।');
-        await context.push(StockFormPage(barcode: code, suggestion: suggestion));
+        await context.pushOwner(StockFormPage(barcode: code, suggestion: suggestion));
       }
     }
   }
@@ -78,7 +78,7 @@ class _StockPageState extends State<StockPage> {
         padding: const EdgeInsets.only(bottom: 80),
         child: FloatingActionButton(
           backgroundColor: context.pal.primaryDark, foregroundColor: Colors.white,
-          onPressed: () => context.push(const StockFormPage()), child: const Icon(Icons.add)),
+          onPressed: () => context.pushOwner(const StockFormPage()), child: const Icon(Icons.add)),
       ),
       body: Q<List<Map<String, dynamic>>>(
         load: () => o.api.list('/stock'),
@@ -112,7 +112,7 @@ class _StockPageState extends State<StockPage> {
             Card2(padding: EdgeInsets.zero, child: Column(children: [
               for (final r in rows)
                 InkWell(
-                  onTap: () => context.push(StockFormPage(item: r)),
+                  onTap: () => context.pushOwner(StockFormPage(item: r)),
                   onLongPress: () async {
                     if (await confirm(context, '"${r['name']}" স্টক থেকে মুছবেন?')) {
                       await o.deleteStock(r['id']);

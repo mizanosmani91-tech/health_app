@@ -25,7 +25,11 @@ class _Body extends StatefulWidget {
 
 class _BodyState extends State<_Body> {
   int _i = 0;
-  void go(int i) => setState(() => _i = i);
+  final _history = <int>[]; // tabs visited before this one, so Back returns to the previous page
+  void go(int i) {
+    if (i == _i) return;
+    setState(() { _history.add(_i); _i = i; });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,13 +47,18 @@ class _BodyState extends State<_Body> {
         ),
       );
     }
-    return Scaffold(
+    return PopScope(
+      canPop: _history.isEmpty,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _history.isNotEmpty) setState(() => _i = _history.removeLast());
+      },
+      child: Scaffold(
       extendBody: true,
       body: IndexedStack(index: _i, children: [OwnerHomePage(go: go), const RequestsPage(), const StockPage(), const BooksPage(), const OwnerProfilePage()]),
       bottomNavigationBar: BottomBar(index: _i, onTap: go, items: const [
         (Icons.space_dashboard, 'হোম'), (Icons.inbox, 'অনুরোধ'), (Icons.inventory_2, 'স্টক'),
         (Icons.account_balance_wallet, 'হিসাব'), (Icons.storefront, 'প্রোফাইল'),
       ]),
-    );
+    ));
   }
 }

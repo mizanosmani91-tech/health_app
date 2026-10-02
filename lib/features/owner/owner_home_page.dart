@@ -44,9 +44,9 @@ class OwnerHomePage extends StatelessWidget {
                 child: Row(children: [
                   Icon(Icons.circle, size: 12, color: ph['isOpen'] == true ? const Color(0xFF7CF0A8) : Colors.white54),
                   const SizedBox(width: 10),
-                  Expanded(child: Text(ph['isOpen'] == true ? 'এখন খোলা' : 'এখন বন্ধ', style: const TextStyle(fontWeight: FontWeight.w500))),
+                  Expanded(child: Text(ph['isOpen'] == true ? 'এখন খোলা' : switch (ph['closedReason']) { 'hours' => 'এখন বন্ধ (সময়ের বাইরে)', 'weekly' => 'এখন বন্ধ (সাপ্তাহিক ছুটি)', _ => 'এখন বন্ধ' }, style: const TextStyle(fontWeight: FontWeight.w500))),
                   Switch(
-                    value: ph['isOpen'] == true, activeThumbColor: Colors.white, activeTrackColor: waGreen,
+                    value: ph['manualOpen'] != false, activeThumbColor: Colors.white, activeTrackColor: waGreen,
                     onChanged: (v) async {
                       await o.updatePharmacy({'isOpen': v});
                     },
@@ -80,7 +80,7 @@ class OwnerHomePage extends StatelessWidget {
                   for (final r in fresh.take(5))
                     Card2(
                       margin: const EdgeInsets.only(bottom: 10),
-                      onTap: () => context.push(RequestDetailPage(id: r['id'])),
+                      onTap: () => context.pushOwner(RequestDetailPage(id: r['id'])),
                       child: Row(children: [
                         IconTile(Icons.person, Tint.all[(r['patientName'] as String).hashCode.abs() % 6], round: true),
                         const SizedBox(width: 12),

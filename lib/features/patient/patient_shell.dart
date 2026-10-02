@@ -15,6 +15,7 @@ class PatientShell extends StatefulWidget {
 
 class _PatientShellState extends State<PatientShell> {
   int _i = 0;
+  final _history = <int>[]; // tabs visited before this one, so Back returns to the previous page
 
   @override
   void initState() {
@@ -22,18 +23,26 @@ class _PatientShellState extends State<PatientShell> {
     NotificationService.instance.requestPermission();
   }
 
-  void go(int i) => setState(() => _i = i);
+  void go(int i) {
+    if (i == _i) return;
+    setState(() { _history.add(_i); _i = i; });
+  }
 
   @override
   Widget build(BuildContext context) {
     final pages = [HomePage(go: go), const MedicinesPage(), const VisitsPage(), const PharmacyPage(), const SettingsPage()];
-    return Scaffold(
+    return PopScope(
+      canPop: _history.isEmpty,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _history.isNotEmpty) setState(() => _i = _history.removeLast());
+      },
+      child: Scaffold(
       extendBody: true,
       body: IndexedStack(index: _i, children: pages),
       bottomNavigationBar: BottomBar(index: _i, onTap: go, items: [
         (Icons.home, 'হোম'), (Icons.medication, 'ওষুধ'), (Icons.medical_services, 'ভিজিট'),
         (Icons.storefront, 'ফার্মেসি'), (Icons.settings, 'সেটিংস'),
       ]),
-    );
+    ));
   }
 }
