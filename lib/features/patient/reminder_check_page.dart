@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../core/bn.dart';
-import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../services/notification_service.dart';
 
