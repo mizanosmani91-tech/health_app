@@ -143,7 +143,7 @@ class _LedgerState extends State<_Ledger> {
             Expanded(child: _addBtn('ব্যয়', Icons.remove, const [Color(0xFFEC6A3E), Color(0xFFC4421A)], () => _add(o, 'expense'))),
           ]),
           const SizedBox(height: 12),
-          if (rows.isEmpty) const Empty(Icons.account_balance_wallet, 'এই সময়ে কোনো হিসাব নেই।'),
+          if (rows.isEmpty) const Empty(Icons.account_balance_wallet, 'এই সময়ে কোনো হিসাব নেই।', centered: true),
           Card2(padding: EdgeInsets.zero, child: Column(children: [
             for (final r in rows)
               Dismissible(
@@ -265,7 +265,7 @@ class _KhataState extends State<_Khata> {
             const SizedBox(height: 12),
             TextField(onChanged: (v) => setState(() => _q = v), decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'নাম খুঁজুন')),
             const SizedBox(height: 12),
-            if (rows.isEmpty) const Empty(Icons.menu_book, 'কোনো বাকি নেই।'),
+            if (rows.isEmpty) const Empty(Icons.menu_book, 'কোনো বাকি নেই।', centered: true),
             Card2(padding: EdgeInsets.zero, child: Column(children: [
               for (final e in rows)
                 Builder(builder: (context) {

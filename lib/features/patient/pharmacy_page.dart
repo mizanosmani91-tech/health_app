@@ -59,10 +59,9 @@ class _PharmacyPageState extends State<PharmacyPage> {
         final need = meds.where((m) => m.active && m.needsRebuy).toList();
         final text = 'আসসালামু আলাইকুম। আমার এই ওষুধগুলো লাগবে:\n${need.map((m) => '• ${m.name} (${bn(m.toBuyDays > 0 ? m.toBuyDays : 7)} দিনের)').join('\n')}\nআছে কি?';
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            const Expanded(child: Muted('পছন্দের ফার্মেসির নম্বর রাখুন। ওষুধ শেষ হলে এক ট্যাপে কল করুন বা তালিকা পাঠান।', size: 14)),
-            IconButton.filledTonal(onPressed: () => _edit(context), icon: const Icon(Icons.add)),
-          ]),
+          const Muted('পছন্দের ফার্মেসির নম্বর রাখুন। ওষুধ শেষ হলে এক ট্যাপে কল করুন বা তালিকা পাঠান।', size: 14),
+          const SizedBox(height: 10),
+          OutlineButton2('ফার্মেসি যোগ করুন', icon: Icons.add, onTap: () => _edit(context)),
           const SizedBox(height: 10),
           for (final f in ph)
             Card2(
@@ -93,7 +92,7 @@ class _PharmacyPageState extends State<PharmacyPage> {
                 ]),
               ]),
             ),
-          if (ph.isEmpty) const Empty(Icons.local_pharmacy, 'কোনো ফার্মেসি যোগ করা নেই।'),
+          if (ph.isEmpty) const Empty(Icons.local_pharmacy, 'কোনো ফার্মেসি যোগ করা নেই।', centered: true),
           if (need.isNotEmpty) ...[
             const SectionTitle('পাঠানোর তালিকা'),
             Card2(padding: EdgeInsets.zero, child: Column(children: [
@@ -106,7 +105,7 @@ class _PharmacyPageState extends State<PharmacyPage> {
             ])),
           ],
           const SizedBox(height: 10),
-          const Muted('এখান থেকে ওষুধ কেনা বা ডেলিভারি হয় না।', size: 12, align: TextAlign.center),
+          const SizedBox(width: double.infinity, child: Muted('এখান থেকে ওষুধ কেনা বা ডেলিভারি হয় না।', size: 12, align: TextAlign.center)),
         ]);
       },
     );
@@ -207,7 +206,7 @@ class _PharmacyPageState extends State<PharmacyPage> {
   Widget _resultList(BuildContext context, List<Map<String, dynamic>> rows, Member me) {
     final byPh = <String, List<Map<String, dynamic>>>{};
     for (final r in rows) { (byPh[r['pharmacy_id']] ??= []).add(r); }
-    if (byPh.isEmpty) return const Empty(Icons.storefront, 'কাছাকাছি কোনো যাচাইকৃত ফার্মেসি পাওয়া যায়নি।');
+    if (byPh.isEmpty) return const Empty(Icons.storefront, 'কাছাকাছি কোনো যাচাইকৃত ফার্মেসি পাওয়া যায়নি।', centered: true);
     final entries = byPh.values.toList()..sort((a, b) => b.where((x) => x['status'] != 'out' && x['status'] != 'unknown').length.compareTo(a.where((x) => x['status'] != 'out' && x['status'] != 'unknown').length));
     return Column(children: [
       for (final list in entries)
@@ -283,7 +282,7 @@ class _PharmacyPageState extends State<PharmacyPage> {
     return Q<List<Map<String, dynamic>>>(
       load: () => Api.instance.list('/requests'),
       builder: (c, rows) {
-        if (rows.isEmpty) return const Empty(Icons.inbox, 'এখনো কোনো অনুরোধ পাঠাননি।');
+        if (rows.isEmpty) return const Empty(Icons.inbox, 'এখনো কোনো অনুরোধ পাঠাননি।', centered: true);
         return Column(children: [
           for (final r in rows)
             Card2(

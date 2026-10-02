@@ -74,13 +74,9 @@ class _StockPageState extends State<StockPage> {
           ),
         ],
       ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 80),
-        child: FloatingActionButton(
-          backgroundColor: context.pal.primaryDark, foregroundColor: Colors.white,
-          onPressed: () => context.pushOwner(const StockFormPage()), child: const Icon(Icons.add)),
-      ),
-      body: Q<List<Map<String, dynamic>>>(
+      body: FabSlot(
+        onPressed: () => context.pushOwner(const StockFormPage()),
+        child: Q<List<Map<String, dynamic>>>(
         load: () => o.api.list('/stock'),
         builder: (c, all) {
           final rows = all.where((r) {
@@ -108,7 +104,7 @@ class _StockPageState extends State<StockPage> {
               }),
             ],
             const SizedBox(height: 12),
-            if (rows.isEmpty) const Empty(Icons.inventory_2, 'কোনো ওষুধ নেই। + চেপে যোগ করুন।'),
+            if (rows.isEmpty) const Empty(Icons.inventory_2, 'কোনো ওষুধ নেই। + চেপে যোগ করুন।', centered: true),
             Card2(padding: EdgeInsets.zero, child: Column(children: [
               for (final r in rows)
                 InkWell(
@@ -148,6 +144,7 @@ class _StockPageState extends State<StockPage> {
             if (rows.isNotEmpty) const Padding(padding: EdgeInsets.only(top: 8), child: Muted('সম্পাদনা করতে চাপুন, মুছতে চেপে ধরুন। শুধু আছে/কম/নেই গ্রাহক দেখে, দাম দেখে না।', size: 12, align: TextAlign.center)),
           ]);
         },
+      ),
       ),
     );
   }

@@ -188,19 +188,43 @@ class Muted extends StatelessWidget {
       Text(text, textAlign: align, style: TextStyle(color: context.pal.muted, fontSize: size, height: 1.4));
 }
 
+/// Empty-state message, centred horizontally. With [centered] it also sits around the middle of the screen
+/// (for pages whose whole body is empty); without it, it just fills its slot (small sections).
 class Empty extends StatelessWidget {
   final IconData icon;
   final String text;
-  const Empty(this.icon, this.text, {super.key});
+  final bool centered;
+  const Empty(this.icon, this.text, {super.key, this.centered = false});
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(children: [
-          Icon(icon, size: 48, color: context.pal.border),
-          const SizedBox(height: 10),
-          Muted(text, size: 14, align: TextAlign.center),
-        ]),
+  Widget build(BuildContext context) => SizedBox(
+        width: double.infinity,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(32, centered ? MediaQuery.sizeOf(context).height * 0.18 : 32, 32, 32),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Icon(icon, size: 48, color: context.pal.border),
+            const SizedBox(height: 10),
+            Muted(text, size: 14, align: TextAlign.center),
+          ]),
+        ),
       );
+}
+
+/// Body + a round "+" button that always sits just above the floating bottom bar (any phone / nav style).
+class FabSlot extends StatelessWidget {
+  final Widget child;
+  final VoidCallback onPressed;
+  const FabSlot({super.key, required this.child, required this.onPressed});
+  @override
+  Widget build(BuildContext context) => Stack(children: [
+        Positioned.fill(child: child),
+        Positioned(
+          right: 18,
+          bottom: 68 + 10 + 16 + MediaQuery.viewPaddingOf(context).bottom,
+          child: FloatingActionButton(
+            backgroundColor: context.pal.primaryDark, foregroundColor: Colors.white,
+            onPressed: onPressed, child: const Icon(Icons.add)),
+        ),
+      ]);
 }
 
 class Chip2 extends StatelessWidget {

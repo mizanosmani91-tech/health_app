@@ -37,7 +37,7 @@ class _RequestsPageState extends State<RequestsPage> {
             Chip2('উত্তর দেওয়া', selected: _f == 'replied', onTap: () => setState(() => _f = 'replied')),
           ]),
           const SizedBox(height: 12),
-          if (rows.isEmpty) const Empty(Icons.inbox, 'কোনো অনুরোধ নেই।'),
+          if (rows.isEmpty) const Empty(Icons.inbox, 'কোনো অনুরোধ নেই।', centered: true),
           for (final r in rows)
             Card2(
               margin: const EdgeInsets.only(bottom: 10),

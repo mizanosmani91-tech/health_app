@@ -16,20 +16,14 @@ class MedicinesPage extends StatelessWidget {
     final me = s.current!;
     return Scaffold(
       appBar: AppBar(title: Text('${me.name}-এর ওষুধ', style: const TextStyle(fontWeight: FontWeight.w600))),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 80),
-        child: FloatingActionButton(
-          backgroundColor: context.pal.primaryDark, foregroundColor: Colors.white,
-          onPressed: () => context.push(MedicineForm(member: me)),
-          child: const Icon(Icons.add),
-        ),
-      ),
-      body: Q<List<Medicine>>(
+      body: FabSlot(
+        onPressed: () => context.push(MedicineForm(member: me)),
+        child: Q<List<Medicine>>(
         load: () => LocalDb.instance.medicines(memberId: me.id),
         builder: (c, meds) {
           final active = meds.where((m) => m.active || m.prescribedDays > m.boughtDays && m.boughtDays == 0).toList();
           final past = meds.where((m) => !active.contains(m)).toList();
-          if (meds.isEmpty) return const Empty(Icons.medication, 'এখনো কোনো ওষুধ নেই।\n+ চেপে যোগ করুন।');
+          if (meds.isEmpty) return const Center(child: Empty(Icons.medication, 'এখনো কোনো ওষুধ নেই।\n+ চেপে যোগ করুন।'));
           return ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 140), children: [
             if (active.isNotEmpty) const SectionTitle('চলছে'),
             for (final m in active) _MedTile(m, me),
@@ -37,6 +31,7 @@ class MedicinesPage extends StatelessWidget {
             for (final m in past) _MedTile(m, me),
           ]);
         },
+      ),
       ),
     );
   }

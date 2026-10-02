@@ -42,11 +42,8 @@ class _VisitsPageState extends State<VisitsPage> {
     final me = context.watch<AppState>().current!;
     return Scaffold(
       appBar: AppBar(title: Text('${me.name}-এর ভিজিট ও টেস্ট', style: const TextStyle(fontWeight: FontWeight.w600))),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 80),
-        child: FloatingActionButton(
-          backgroundColor: context.pal.primaryDark, foregroundColor: Colors.white,
-          onPressed: () => showModalBottomSheet(
+      body: FabSlot(
+        onPressed: () => showModalBottomSheet(
             context: context,
             builder: (c) => SafeArea(
               child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -60,10 +57,7 @@ class _VisitsPageState extends State<VisitsPage> {
               ]),
             ),
           ),
-          child: const Icon(Icons.add),
-        ),
-      ),
-      body: Q<List<_Item>>(
+        child: Q<List<_Item>>(
         load: () => _load(me),
         builder: (c, all) {
           final items = all.where((i) => _filter == 0 || (_filter == 1 ? i.visit != null : i.test != null)).toList();
@@ -73,10 +67,11 @@ class _VisitsPageState extends State<VisitsPage> {
                 Padding(padding: const EdgeInsets.only(right: 8), child: Chip2(l, selected: _filter == i, onTap: () => setState(() => _filter = i))),
             ]),
             const SizedBox(height: 12),
-            if (items.isEmpty) const Empty(Icons.event_note, 'এখনো কিছু যোগ করা হয়নি।'),
+            if (items.isEmpty) const Empty(Icons.event_note, 'এখনো কিছু যোগ করা হয়নি।', centered: true),
             for (final i in items) i.visit != null ? _visitTile(context, me, i.visit!) : _testTile(context, me, i.test!),
           ]);
         },
+      ),
       ),
     );
   }
