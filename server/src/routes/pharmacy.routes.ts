@@ -12,7 +12,7 @@ const pharmacyJson = (p: Pharmacy) => ({
 
 const stockJson = (s: StockItem) => ({
   id: s.id, name: s.name, genericName: s.genericName, form: s.form, qty: n(s.qty), unit: s.unit,
-  buyPrice: n(s.buyPrice), sellPrice: n(s.sellPrice), expiry: s.expiry, batchNo: s.batchNo,
+  buyPrice: n(s.buyPrice), sellPrice: n(s.sellPrice), expiry: s.expiry, batchNo: s.batchNo, barcode: s.barcode,
   status: s.status, updatedAt: s.updatedAt,
 });
 
@@ -26,6 +26,7 @@ const stockBody = z.object({
   sellPrice: optMoney,
   expiry: day.nullable().optional(),
   batchNo: optText(60),
+  barcode: z.preprocess((v) => (v === '' ? null : v), z.string().regex(/^\d{8,14}$/, 'barcode must be 8-14 digits').nullable().optional()),
   status: z.nativeEnum(StockStatus).default('in'),
 });
 
@@ -75,6 +76,14 @@ export function pharmacyRoutes(app: Express, d: { db: Db; authed: any; role: any
   app.get('/stock', ...owner, async (req, res) => {
     const p = await mine(req);
     res.json((await db.stockItem.findMany({ where: { pharmacyId: p.id }, orderBy: { name: 'asc' } })).map(stockJson));
+  });
+  // Look a scanned pack up in this pharmacy's own product list (404 = first time we see it).
+  app.get('/stock/barcode/:code', ...owner, async (req, res) => {
+    const p = await mine(req);
+    if (!/^\d{8,14}$/.test(req.params.code)) throw new HttpError(400, 'barcode must be 8-14 digits');
+    const s = await db.stockItem.findFirst({ where: { pharmacyId: p.id, barcode: req.params.code } });
+    if (!s) throw new HttpError(404, 'not found');
+    res.json(stockJson(s));
   });
   app.post('/stock', ...owner, async (req, res) => {
     const p = await mine(req);

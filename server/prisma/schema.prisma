@@ -101,10 +101,12 @@ model StockItem {
   sellPrice   Decimal?    @db.Decimal(12, 2)
   expiry      String?     // YYYY-MM-DD
   batchNo     String?
+  barcode     String?     // EAN-13 / GTIN printed on the pack; the pharmacy's own product list is built from these
   status      StockStatus @default(in)
   updatedAt   DateTime    @updatedAt
 
   @@index([pharmacyId])
+  @@unique([pharmacyId, barcode])
 }
 
 model MedRequest {

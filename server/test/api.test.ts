@@ -123,6 +123,32 @@ test('full pharmacy flow: register, verify, stock, search privacy, request, repl
   assert.equal(again.json[0].status, 'low');
 });
 
+test('barcode: look up by scanned code, unique per pharmacy, owner-only', async () => {
+  const owner = await login('owner6', 'owner');
+  await call('POST', '/pharmacy', { token: owner, body: shop('F') });
+  assert.equal((await call('GET', '/stock/barcode/8940001285711', { token: owner })).status, 404);
+  const a = await call('POST', '/stock', { token: owner, body: { name: 'Ace Plus', barcode: '8940001285711', sellPrice: 12 } });
+  assert.equal(a.status, 201);
+  assert.equal(a.json.barcode, '8940001285711');
+  const hit = await call('GET', '/stock/barcode/8940001285711', { token: owner });
+  assert.equal(hit.status, 200);
+  assert.equal(hit.json.name, 'Ace Plus');
+  // same code twice in one shop is rejected, empty barcodes may repeat
+  assert.equal((await call('POST', '/stock', { token: owner, body: { name: 'Dup', barcode: '8940001285711' } })).status, 409);
+  assert.equal((await call('POST', '/stock', { token: owner, body: { name: 'NoCode1' } })).status, 201);
+  assert.equal((await call('POST', '/stock', { token: owner, body: { name: 'NoCode2', barcode: '' } })).status, 201);
+  assert.equal((await call('POST', '/stock', { token: owner, body: { name: 'Bad', barcode: 'abc' } })).status, 400);
+  // another shop can use the same code, and cannot see ours
+  const o2 = await login('owner7', 'owner');
+  await call('POST', '/pharmacy', { token: o2, body: shop('G') });
+  assert.equal((await call('GET', '/stock/barcode/8940001285711', { token: o2 })).status, 404);
+  assert.equal((await call('POST', '/stock', { token: o2, body: { name: 'Mine', barcode: '8940001285711' } })).status, 201);
+  const pat = await login('pat9', 'patient');
+  assert.equal((await call('GET', '/stock/barcode/8940001285711', { token: pat })).status, 403);
+  // patients' search never exposes the barcode
+  assert.ok(!JSON.stringify((await call('POST', '/search', { token: pat, body: { names: ['Ace'] } })).json).includes('8940001285711'));
+});
+
 test('khata payments are atomic, guarded, and mirror into the ledger', async () => {
   const owner = await login('owner3', 'owner');
   await call('POST', '/pharmacy', { token: owner, body: shop('C') });

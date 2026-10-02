@@ -5,6 +5,8 @@ import '../../core/bn.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../data/catalog.dart';
+import '../../services/api.dart';
+import 'scan_page.dart';
 import 'owner_ctx.dart';
 
 class StockPage extends StatefulWidget {
@@ -22,6 +24,28 @@ class _StockPageState extends State<StockPage> {
     return e != null && e.difference(DateTime.now()).inDays <= 90;
   }
 
+  /// Scan a pack: known barcode -> open that item, unknown -> new item with the barcode filled in.
+  Future<void> _scan(BuildContext context, OwnerCtx o) async {
+    final code = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => const ScanPage()));
+    if (code == null || !context.mounted) return;
+    try {
+      final item = await o.api.get('/stock/barcode/$code') as Map<String, dynamic>;
+      if (context.mounted) {
+        context.toast('চেনা ওষুধ: ${item['name']}');
+        await context.push(StockFormPage(item: item));
+      }
+    } on ApiException catch (e) {
+      if (e.status != 404) {
+        if (context.mounted) context.toast('$e');
+        return;
+      }
+      if (context.mounted) {
+        context.toast('নতুন ওষুধ। নাম লিখে সংরক্ষণ করুন, পরের বার স্ক্যান করলেই সব ভরবে।');
+        await context.push(StockFormPage(barcode: code));
+      }
+    }
+  }
+
   Future<void> _setStatus(OwnerCtx o, String id, String s) async {
     await o.setStockStatus(id, s);
     o.touch();
@@ -31,7 +55,16 @@ class _StockPageState extends State<StockPage> {
   Widget build(BuildContext context) {
     final o = context.watch<OwnerCtx>();
     return Scaffold(
-      appBar: AppBar(title: const Text('স্টক তালিকা', style: TextStyle(fontWeight: FontWeight.w600))),
+      appBar: AppBar(
+        title: const Text('স্টক তালিকা', style: TextStyle(fontWeight: FontWeight.w600)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.qr_code_scanner),
+            tooltip: 'বারকোড স্ক্যান',
+            onPressed: () => _scan(context, o),
+          ),
+        ],
+      ),
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 80),
         child: FloatingActionButton(
@@ -114,7 +147,8 @@ class _StockPageState extends State<StockPage> {
 /// Add (from catalog search or by typing a name) or edit a stock item.
 class StockFormPage extends StatefulWidget {
   final Map<String, dynamic>? item;
-  const StockFormPage({super.key, this.item});
+  final String? barcode;
+  const StockFormPage({super.key, this.item, this.barcode});
   @override
   State<StockFormPage> createState() => _StockFormPageState();
 }
@@ -129,6 +163,7 @@ class _StockFormPageState extends State<StockFormPage> {
   late final _buy = TextEditingController(text: i?['buyPrice'] == null ? '' : bn(i!['buyPrice']));
   late final _sell = TextEditingController(text: i?['sellPrice'] == null ? '' : bn(i!['sellPrice']));
   late final _batch = TextEditingController(text: i?['batchNo']);
+  late final _barcode = TextEditingController(text: i?['barcode'] ?? widget.barcode);
   late String _form = i?['form'] ?? 'ট্যাবলেট';
   late String _status = i?['status'] ?? 'in';
   late final _expiry = TextEditingController(text: i?['expiry'] == null ? '' : bn((i!['expiry'] as String).substring(0, 7).split('-').reversed.join('/')));
@@ -156,7 +191,8 @@ class _StockFormPageState extends State<StockFormPage> {
       'name': _name.text.trim(),
       'genericName': _generic.text.trim().isEmpty ? null : _generic.text.trim(),
       'form': _form, 'qty': _num(_qty), 'unit': _unit.text.trim(), 'buyPrice': _num(_buy), 'sellPrice': _num(_sell),
-      'expiry': _parseExpiry(), 'batchNo': _batch.text.trim().isEmpty ? null : _batch.text.trim(), 'status': _status,
+      'expiry': _parseExpiry(), 'batchNo': _batch.text.trim().isEmpty ? null : _batch.text.trim(),
+      'barcode': _barcode.text.trim().isEmpty ? null : en(_barcode.text.trim()), 'status': _status,
     };
     try {
       await o.saveStock(i?['id'], data);
@@ -192,6 +228,21 @@ class _StockFormPageState extends State<StockFormPage> {
                 Pill('+ নিন', context.pal.soft, context.pal.primaryDark),
               ]),
             ),
+          Row(children: [
+            Expanded(child: Field('বারকোড (ঐচ্ছিক)', controller: _barcode, icon: Icons.qr_code, keyboard: TextInputType.number)),
+            const SizedBox(width: 8),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: IconButton.filledTonal(
+                tooltip: 'স্ক্যান',
+                icon: const Icon(Icons.qr_code_scanner),
+                onPressed: () async {
+                  final c = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => const ScanPage()));
+                  if (c != null) setState(() => _barcode.text = c);
+                },
+              ),
+            ),
+          ]),
           Field('জেনেরিক নাম (ঐচ্ছিক)', controller: _generic, icon: Icons.science),
           const Padding(padding: EdgeInsets.only(left: 4, bottom: 8), child: Text('ধরন', style: TextStyle(fontWeight: FontWeight.w500))),
           Wrap(spacing: 8, runSpacing: 8, children: [
