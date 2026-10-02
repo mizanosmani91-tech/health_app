@@ -7,12 +7,14 @@ import 'auth_service.dart';
 import 'notification_service.dart';
 import 'prefs.dart';
 
-enum Stage { loading, onboarding, login, pickRole, patientSetup, ownerSetup, patient, owner }
+enum Stage { loading, onboarding, login, patientSetup, ownerSetup, patient, owner }
 
 class AppState extends ChangeNotifier {
   Stage stage = Stage.loading;
   UserRole? role;
   bool offline = false; // patient-only mode when Supabase isn't configured
+  /// True only for accounts that actually have a pharmacy: they alone see the switch back to it.
+  bool ownsPharmacy = false;
   List<Member> members = [];
   Member? current;
 
@@ -41,7 +43,16 @@ class AppState extends ChangeNotifier {
         // Offline with a cached session: fall back to the last known role.
         role ??= Prefs.cachedRole;
       }
-      if (role == null) return _go(Stage.pickRole);
+      // Everyone starts as a normal (personal/family) user. The pharmacy side is only entered through the
+      // small "pharmacy owner" link on the login screen, so nobody is asked "who are you?".
+      final wantsOwner = Prefs.ownerIntent;
+      Prefs.ownerIntent = false;
+      if (role == null || (wantsOwner && role != UserRole.owner)) {
+        role = wantsOwner ? UserRole.owner : UserRole.patient;
+        try {
+          await _auth.saveRole(role!);
+        } catch (_) {/* preference only; re-sent next time */}
+      }
       Prefs.cachedRole = role;
     }
     if (role == UserRole.owner) {
@@ -49,9 +60,24 @@ class AppState extends ChangeNotifier {
       return _go(has ? Stage.owner : Stage.ownerSetup);
     }
     await reloadMembers();
+    if (!offline) _refreshOwns(); // not awaited: only decides whether a quiet switch row is shown
     if (members.isEmpty) return _go(Stage.patientSetup);
     NotificationService.instance.rescheduleAll();
     _go(Stage.patient);
+  }
+
+  Future<void> _refreshOwns() async {
+    var owns = false;
+    try {
+      await Api.instance.get('/pharmacy');
+      owns = true;
+    } catch (_) {
+      owns = false;
+    }
+    if (owns != ownsPharmacy) {
+      ownsPharmacy = owns;
+      notifyListeners();
+    }
   }
 
   Future<bool> _hasPharmacy() async {
@@ -80,12 +106,6 @@ class AppState extends ChangeNotifier {
 
   Future<void> signedIn() => _resolve();
 
-  Future<void> chooseRole(UserRole r) async {
-    await _auth.saveRole(r);
-    role = r;
-    await _resolve();
-  }
-
   Future<void> setupDone() => _resolve();
 
   /// One account can be both a patient and a pharmacy owner. The server only stores the mode the
@@ -99,13 +119,6 @@ class AppState extends ChangeNotifier {
     }
     role = r;
     await _resolve();
-  }
-
-  /// Lets a signed-in user change their mind about the role (only before any data exists).
-  Future<void> resetRole() async {
-    role = null;
-    Prefs.cachedRole = null;
-    _go(Stage.pickRole);
   }
 
   Future<void> reloadMembers() async {
@@ -135,6 +148,7 @@ class AppState extends ChangeNotifier {
   Future<void> signOut() async {
     if (!offline) await _auth.signOut();
     offline = false;
+    ownsPharmacy = false;
     role = null;
     Prefs.cachedRole = null;
     await _resolve();

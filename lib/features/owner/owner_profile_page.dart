@@ -94,7 +94,7 @@ class OwnerProfilePage extends StatelessWidget {
           Card2(
             padding: EdgeInsets.zero,
             margin: const EdgeInsets.only(bottom: 12),
-            child: row(Icons.swap_horiz, Tint.green, 'রোগী মোডে যান', sub: 'নিজের ও পরিবারের ওষুধ, ভিজিট, টেস্ট',
+            child: row(Icons.swap_horiz, Tint.green, 'আমার স্বাস্থ্য-অ্যাপে যান', sub: 'নিজের ও পরিবারের ওষুধ, ভিজিট, টেস্ট',
                 onTap: () => context.read<AppState>().switchRole(UserRole.patient),
                 trailing: Icon(Icons.chevron_right, color: context.pal.muted)),
           ),

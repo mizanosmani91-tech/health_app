@@ -4,6 +4,7 @@ import '../../core/config.dart';
 import '../../core/widgets.dart';
 import '../../services/app_state.dart';
 import '../../services/auth_service.dart';
+import '../../services/prefs.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,12 +15,14 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   bool _busy = false;
 
-  Future<void> _google() async {
+  Future<void> _google({bool owner = false}) async {
     setState(() => _busy = true);
+    Prefs.ownerIntent = owner;
     try {
       await AuthService.instance.signInWithGoogle();
       if (mounted) await context.read<AppState>().signedIn();
     } catch (e) {
+      Prefs.ownerIntent = false;
       if (mounted) context.toast('লগইন হয়নি: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -59,14 +62,21 @@ class _LoginScreenState extends State<LoginScreen> {
               Card2(
                 color: const Color(0xFFFFF0D1),
                 child: const Text('সার্ভার কনফিগার করা নেই (API_BASE_URL)। '
-                    'চাইলে নিচের বোতামে অফলাইন মোডে শুধু রোগী/পরিবারের অংশ চালিয়ে দেখতে পারেন।',
+                    'চাইলে নিচের বোতামে অফলাইন মোডে শুধু ব্যক্তিগত/পরিবারের অংশ চালিয়ে দেখতে পারেন।',
                     style: TextStyle(color: Color(0xFF6B4305), height: 1.5)),
               ),
               const SizedBox(height: 12),
               OutlineButton2('অফলাইন মোডে চালান', icon: Icons.cloud_off,
                   onTap: () => context.read<AppState>().continueOffline()),
             ],
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+            Center(
+              child: TextButton(
+                onPressed: _busy || !Config.hasBackend ? null : () => _google(owner: true),
+                child: Text('ফার্মেসির মালিক? এখান থেকে ঢুকুন', style: TextStyle(color: context.pal.muted, fontSize: 14)),
+              ),
+            ),
+            const SizedBox(height: 8),
             Card2(
               color: const Color(0xFFF0EDFF),
               child: const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [

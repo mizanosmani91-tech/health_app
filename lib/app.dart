@@ -5,7 +5,6 @@ import 'core/theme.dart';
 import 'core/widgets.dart';
 import 'features/auth/login_screen.dart';
 import 'features/auth/onboarding_screen.dart';
-import 'features/auth/role_screen.dart';
 import 'features/owner/owner_register_screen.dart';
 import 'features/owner/owner_shell.dart';
 import 'features/patient/patient_setup_screen.dart';
@@ -29,7 +28,6 @@ class HealthApp extends StatelessWidget {
         Stage.loading => const Scaffold(body: Center(child: CircularProgressIndicator())),
         Stage.onboarding => const OnboardingScreen(),
         Stage.login => const LoginScreen(),
-        Stage.pickRole => const RoleScreen(),
         Stage.patientSetup => const PatientSetupScreen(),
         Stage.ownerSetup => const OwnerRegisterScreen(),
         Stage.patient => const PatientShell(),

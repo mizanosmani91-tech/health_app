@@ -81,7 +81,7 @@ class _OwnerRegisterScreenState extends State<OwnerRegisterScreen> {
               ]),
             ),
             const SizedBox(height: 10),
-            TextButton(onPressed: () => context.read<AppState>().switchRole(UserRole.patient), child: const Text('রোগী মোডে ফিরে যান')),
+            TextButton(onPressed: () => context.read<AppState>().switchRole(UserRole.patient), child: const Text('ফিরে যান (আমার স্বাস্থ্য-অ্যাপে)')),
             TextButton(onPressed: () => context.read<AppState>().signOut(), child: const Text('লগআউট')),
           ],
         ),

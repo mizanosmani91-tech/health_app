@@ -40,6 +40,10 @@ class Prefs {
   static set cachedRole(UserRole? v) =>
       v == null ? _p.remove('role') : _p.setString('role', v.name);
 
+  /// Set by the small "pharmacy owner? sign in here" link on the login screen; consumed once after sign-in.
+  static bool get ownerIntent => _p.getBool('owner_intent') ?? false;
+  static set ownerIntent(bool v) => _p.setBool('owner_intent', v);
+
   static String? get apiToken => _p.getString('api_token');
   static set apiToken(String? v) => v == null ? _p.remove('api_token') : _p.setString('api_token', v);
 

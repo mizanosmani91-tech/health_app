@@ -145,7 +145,7 @@ class _StockPageState extends State<StockPage> {
                   ),
                 ),
             ])),
-            if (rows.isNotEmpty) const Padding(padding: EdgeInsets.only(top: 8), child: Muted('সম্পাদনা করতে চাপুন, মুছতে চেপে ধরুন। শুধু আছে/কম/নেই রোগী দেখে, দাম দেখে না।', size: 12, align: TextAlign.center)),
+            if (rows.isNotEmpty) const Padding(padding: EdgeInsets.only(top: 8), child: Muted('সম্পাদনা করতে চাপুন, মুছতে চেপে ধরুন। শুধু আছে/কম/নেই গ্রাহক দেখে, দাম দেখে না।', size: 12, align: TextAlign.center)),
           ]);
         },
       ),
@@ -290,7 +290,7 @@ class _StockFormPageState extends State<StockFormPage> {
             const SizedBox(width: 10),
             Expanded(child: Field('ব্যাচ নম্বর', controller: _batch)),
           ]),
-          const Padding(padding: EdgeInsets.only(left: 4, bottom: 8), child: Text('রোগীরা যা দেখবে', style: TextStyle(fontWeight: FontWeight.w500))),
+          const Padding(padding: EdgeInsets.only(left: 4, bottom: 8), child: Text('গ্রাহকরা যা দেখবে', style: TextStyle(fontWeight: FontWeight.w500))),
           Row(children: [
             for (final (k, l) in [('in', 'আছে'), ('low', 'কম'), ('out', 'নেই')])
               Padding(padding: const EdgeInsets.only(right: 8), child: Chip2(l, selected: _status == k, onTap: () => setState(() => _status = k))),

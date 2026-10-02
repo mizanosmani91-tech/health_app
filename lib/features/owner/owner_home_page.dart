@@ -65,13 +65,13 @@ class OwnerHomePage extends StatelessWidget {
                     color: const Color(0xFFFFF0D1),
                     child: Row(children: [
                       const Icon(Icons.schedule, color: Color(0xFFA86A08)), const SizedBox(width: 10),
-                      Expanded(child: Text(ph['status'] == 'rejected' ? 'আপনার আবেদন গৃহীত হয়নি। প্রোফাইলে তথ্য ঠিক করে আবার চেষ্টা করুন।' : 'যাচাই চলছে। যাচাই শেষ হলে রোগীরা আপনার দোকান দেখতে পাবে।',
+                      Expanded(child: Text(ph['status'] == 'rejected' ? 'আপনার আবেদন গৃহীত হয়নি। প্রোফাইলে তথ্য ঠিক করে আবার চেষ্টা করুন।' : 'যাচাই চলছে। যাচাই শেষ হলে গ্রাহকরা আপনার দোকান দেখতে পাবে।',
                           style: const TextStyle(color: Color(0xFF6B4305), height: 1.5))),
                     ]),
                   ),
                 ),
               Row(children: [stat(bn(fresh.length), 'নতুন অনুরোধ', Tint.orange), stat(bn(replied), 'উত্তর দেওয়া', Tint.green)]),
-              Row(children: [stat(bn(todays), 'আজকের মোট', Tint.blue), stat(bn(regulars), 'মোট রোগী', Tint.purple)]),
+              Row(children: [stat(bn(todays), 'আজকের মোট', Tint.blue), stat(bn(regulars), 'মোট গ্রাহক', Tint.purple)]),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 6),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
