@@ -31,10 +31,19 @@ jobs:
           clean() { printf '%s' "$1" | tr -d ' \r\n\t'; }
           KS="$(clean "$KS")"; KSP="$(clean "$KSP")"; KEYALIAS="$(clean "$KEYALIAS")"; KEYP="$(clean "$KEYP")"
           printf '%s' "$KS" | base64 -d > android/release.jks || { echo "::error::ANDROID_KEYSTORE_BASE64 is not valid base64 (re-copy the whole single line)"; exit 1; }
-          echo "keystore file size: $(stat -c %s android/release.jks) bytes (a normal one is ~2500-3500)"
-          if ! keytool -list -v -keystore android/release.jks -storepass "$KSP" > /tmp/ks.txt 2>/tmp/ks.err; then
-            echo "::error::Cannot open the keystore. Either ANDROID_KEYSTORE_PASSWORD is wrong, or ANDROID_KEYSTORE_BASE64 was truncated/corrupted."
-            cat /tmp/ks.err
+          echo "keystore file size: $(stat -c %s android/release.jks) bytes"
+          echo "keystore file sha256 (compare with your local file): $(sha256sum android/release.jks | cut -d' ' -f1)"
+          echo "keystore file format: $(head -c 4 android/release.jks | od -An -tx1 | tr -d ' \n' | sed 's/^feedfeed$/JKS (old format)/; s/^3082.*/PKCS12/')"
+          OPEN=""
+          for cand in "$KSP" "$KEYP"; do
+            if keytool -list -v -keystore android/release.jks -storepass "$cand" > /tmp/ks.txt 2>/tmp/ks.err; then OPEN="$cand"; break; fi
+          done
+          if [ -z "$OPEN" ]; then
+            echo "::error::The keystore opens with NEITHER ANDROID_KEYSTORE_PASSWORD nor ANDROID_KEY_PASSWORD. Wrong password(s), or the base64 secret is a different/corrupted keystore. Compare the sha256 above with: certutil -hashfile release.jks SHA256 (Windows) / sha256sum release.jks"
+            exit 1
+          fi
+          if [ "$OPEN" != "$KSP" ]; then
+            echo "::error::ANDROID_KEYSTORE_PASSWORD is WRONG, but the value in ANDROID_KEY_PASSWORD opens the keystore. Put that same value into ANDROID_KEYSTORE_PASSWORD."
             exit 1
           fi
           echo "Aliases in keystore:"; grep -E "^Alias name:" /tmp/ks.txt
