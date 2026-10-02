@@ -30,11 +30,11 @@ export function authRoutes(
 
   app.get('/me', d.authed, (req, res) => res.json(json(req.user!)));
 
-  // Write-once: a role can be chosen exactly one time.
+  // The role is only the mode the app opens in (a preference). It is NOT an authorization boundary:
+  // one account may be a patient and own a pharmacy; access is decided by ownership.
   app.post('/me/role', d.authed, async (req, res) => {
     const { role } = parse(z.object({ role: z.nativeEnum(Role) }), req.body);
-    const r = await d.db.user.updateMany({ where: { id: req.user!.id, role: null }, data: { role } });
-    if (!r.count) throw new HttpError(409, 'role already chosen');
+    await d.db.user.update({ where: { id: req.user!.id }, data: { role } });
     res.json(json({ ...req.user!, role }));
   });
 }

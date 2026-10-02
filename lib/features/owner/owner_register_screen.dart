@@ -6,6 +6,7 @@ import '../../core/bn.dart';
 import '../../core/widgets.dart';
 import '../../services/app_state.dart';
 import '../../services/api.dart';
+import '../../services/auth_service.dart';
 import '../../services/images.dart';
 
 class OwnerRegisterScreen extends StatefulWidget {
@@ -80,6 +81,7 @@ class _OwnerRegisterScreenState extends State<OwnerRegisterScreen> {
               ]),
             ),
             const SizedBox(height: 10),
+            TextButton(onPressed: () => context.read<AppState>().switchRole(UserRole.patient), child: const Text('রোগী মোডে ফিরে যান')),
             TextButton(onPressed: () => context.read<AppState>().signOut(), child: const Text('লগআউট')),
           ],
         ),

@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import { jwtVerify } from 'jose';
-import { Role, User } from '@prisma/client';
+import { User } from '@prisma/client';
 import { Db } from '../prisma';
 import { HttpError } from '../http';
 
@@ -26,7 +26,7 @@ export function makeAuth(db: Db, key: Uint8Array) {
     req.user = user;
     next();
   };
-  const role = (r: Role) => (req: Request, _res: Response, next: NextFunction) =>
-    next(req.user?.role === r ? undefined : new HttpError(403, `${r} account required`));
-  return { authed, role };
+  // No role gate on purpose: one account can be both a patient and a pharmacy owner.
+  // What a user may touch is decided by ownership (their own pharmacy / their own requests).
+  return { authed };
 }

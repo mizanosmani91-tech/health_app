@@ -4,7 +4,7 @@ import { Availability, MedRequest, RequestItem } from '@prisma/client';
 import { Db } from '../prisma';
 import { HttpError, optText, parse, simpleLimit, text } from '../http';
 
-type Full = MedRequest & { items: RequestItem[]; pharmacy?: { name: string; phone: string } };
+type Full = MedRequest & { items: RequestItem[]; pharmacy?: { name: string; phone: string; ownerId?: string } };
 const json = (r: Full, withShop = false) => ({
   id: r.id, pharmacyId: r.pharmacyId, patientId: r.patientId, patientName: r.patientName, status: r.status,
   replyMessage: r.replyMessage, repliedAt: r.repliedAt, createdAt: r.createdAt,
@@ -12,10 +12,10 @@ const json = (r: Full, withShop = false) => ({
   ...(withShop && r.pharmacy ? { pharmacyName: r.pharmacy.name, pharmacyPhone: r.pharmacy.phone } : {}),
 });
 
-export function requestRoutes(app: Express, d: { db: Db; authed: any; role: any }) {
+export function requestRoutes(app: Express, d: { db: Db; authed: any }) {
   const { db } = d;
-  const owner = [d.authed, d.role('owner')];
-  const patient = [d.authed, d.role('patient')];
+  const owner = [d.authed];
+  const patient = [d.authed];
 
   app.post('/requests', ...patient, simpleLimit(60), async (req, res) => {
     const b = parse(
@@ -36,8 +36,10 @@ export function requestRoutes(app: Express, d: { db: Db; authed: any; role: any 
     res.status(201).json({ id: r.id });
   });
 
+  // ?as=owner -> requests sent to my pharmacy; default -> requests I sent as a patient.
   app.get('/requests', d.authed, async (req, res) => {
-    if (req.user!.role === 'owner') {
+    const { as } = parse(z.object({ as: z.enum(['owner', 'patient']).default('patient') }), req.query);
+    if (as === 'owner') {
       const p = await db.pharmacy.findUnique({ where: { ownerId: req.user!.id } });
       if (!p) throw new HttpError(404, 'no pharmacy yet');
       const rows = await db.medRequest.findMany({ where: { pharmacyId: p.id }, include: { items: true }, orderBy: { createdAt: 'desc' }, take: 300 });
@@ -53,7 +55,7 @@ export function requestRoutes(app: Express, d: { db: Db; authed: any; role: any 
   // 404 (not 403) for other people's requests, so ids can't be probed.
   const load = async (req: Request): Promise<Full> => {
     const r = await db.medRequest.findUnique({ where: { id: req.params.id }, include: { items: true, pharmacy: { select: { name: true, phone: true, ownerId: true } } } });
-    const ok = r && (r.patientId === req.user!.id || (req.user!.role === 'owner' && r.pharmacy.ownerId === req.user!.id));
+    const ok = r && (r.patientId === req.user!.id || r.pharmacy.ownerId === req.user!.id);
     if (!r || !ok) throw new HttpError(404, 'not found');
     return r;
   };
@@ -61,6 +63,8 @@ export function requestRoutes(app: Express, d: { db: Db; authed: any; role: any 
 
   app.post('/requests/:id/reply', ...owner, async (req, res) => {
     const r = await load(req);
+    // Only the shop's owner may answer; the patient who sent the request can read it but not answer it.
+    if (r.pharmacy!.ownerId !== req.user!.id) throw new HttpError(404, 'not found');
     const b = parse(z.object({ items: z.array(z.nativeEnum(Availability)), message: optText(500) }), req.body);
     if (b.items.length !== r.items.length) throw new HttpError(400, 'one availability per item required');
     await db.$transaction([

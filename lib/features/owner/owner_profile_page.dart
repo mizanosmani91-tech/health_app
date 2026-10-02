@@ -4,6 +4,7 @@ import '../../core/bn.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../services/app_state.dart';
+import '../../services/auth_service.dart';
 import 'owner_ctx.dart';
 
 class OwnerProfilePage extends StatelessWidget {
@@ -90,6 +91,13 @@ class OwnerProfilePage extends StatelessWidget {
             )),
             row(Icons.badge, Tint.green, 'লাইসেন্স ${p['licenseNo']}', sub: st == 'verified' ? 'যাচাই সম্পন্ন' : 'যাচাই চলছে'),
           ])),
+          Card2(
+            padding: EdgeInsets.zero,
+            margin: const EdgeInsets.only(bottom: 12),
+            child: row(Icons.swap_horiz, Tint.green, 'রোগী মোডে যান', sub: 'নিজের ও পরিবারের ওষুধ, ভিজিট, টেস্ট',
+                onTap: () => context.read<AppState>().switchRole(UserRole.patient),
+                trailing: Icon(Icons.chevron_right, color: context.pal.muted)),
+          ),
           Card2(
             color: const Color(0xFFFFE9E0),
             onTap: () async { if (await confirm(context, 'লগআউট করবেন?') && context.mounted) context.read<AppState>().signOut(); },

@@ -27,7 +27,7 @@ export function createApp({ db, verifyGoogle, jwtSecret, adminKey, log }: AppDep
   const key = new TextEncoder().encode(jwtSecret);
   const issue = (id: string) =>
     new SignJWT({}).setProtectedHeader({ alg: 'HS256' }).setSubject(id).setIssuedAt().setExpirationTime('60d').sign(key);
-  const { authed, role } = makeAuth(db, key);
+  const { authed } = makeAuth(db, key);
 
   const app = express();
   app.disable('x-powered-by');
@@ -40,9 +40,9 @@ export function createApp({ db, verifyGoogle, jwtSecret, adminKey, log }: AppDep
   app.get('/health', (_req, res) => res.json({ ok: true }));
 
   authRoutes(app, { db, verifyGoogle, issue, authed });
-  pharmacyRoutes(app, { db, authed, role });
-  requestRoutes(app, { db, authed, role });
-  bookRoutes(app, { db, authed, role });
+  pharmacyRoutes(app, { db, authed });
+  requestRoutes(app, { db, authed });
+  bookRoutes(app, { db, authed });
   if (adminKey) adminRoutes(app, { db, adminKey });
 
   app.use((_req, _res, next) => next(new HttpError(404, 'not found')));

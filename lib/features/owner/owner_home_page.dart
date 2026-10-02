@@ -15,7 +15,7 @@ class OwnerHomePage extends StatelessWidget {
     final o = context.watch<OwnerCtx>();
     final ph = o.pharmacy!;
     return Q<List<Map<String, dynamic>>>(
-      load: () => o.api.list('/requests'),
+      load: () => o.api.list('/requests', query: {'as': 'owner'}),
       builder: (c, reqs) {
         final today = dateOnly(DateTime.now());
         final fresh = reqs.where((r) => r['status'] == 'new').toList();

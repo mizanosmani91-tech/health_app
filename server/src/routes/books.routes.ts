@@ -9,9 +9,9 @@ const khataJson = (k: KhataEntry) => ({
   id: k.id, direction: k.direction, partyName: k.partyName, phone: k.phone, amount: n(k.amount), paid: n(k.paid), createdAt: k.createdAt,
 });
 
-export function bookRoutes(app: Express, d: { db: Db; authed: any; role: any }) {
+export function bookRoutes(app: Express, d: { db: Db; authed: any }) {
   const { db } = d;
-  const owner = [d.authed, d.role('owner')];
+  const owner = [d.authed]; // ownership is checked by mine(): you only ever see your own pharmacy
   const mine = async (req: Request) => {
     const p = await db.pharmacy.findUnique({ where: { ownerId: req.user!.id } });
     if (!p) throw new HttpError(404, 'no pharmacy yet');

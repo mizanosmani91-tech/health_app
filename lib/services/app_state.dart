@@ -88,6 +88,19 @@ class AppState extends ChangeNotifier {
 
   Future<void> setupDone() => _resolve();
 
+  /// One account can be both a patient and a pharmacy owner. The server only stores the mode the
+  /// app opens in; what you can access is decided by ownership, so switching needs no approval.
+  Future<void> switchRole(UserRole r) async {
+    if (offline) return;
+    try {
+      await _auth.saveRole(r);
+    } catch (_) {
+      // Offline: still switch locally, the preference is re-sent next time.
+    }
+    role = r;
+    await _resolve();
+  }
+
   /// Lets a signed-in user change their mind about the role (only before any data exists).
   Future<void> resetRole() async {
     role = null;

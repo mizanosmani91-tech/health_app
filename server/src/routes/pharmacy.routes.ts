@@ -30,10 +30,10 @@ const stockBody = z.object({
   status: z.nativeEnum(StockStatus).default('in'),
 });
 
-export function pharmacyRoutes(app: Express, d: { db: Db; authed: any; role: any }) {
+export function pharmacyRoutes(app: Express, d: { db: Db; authed: any }) {
   const { db } = d;
-  const owner = [d.authed, d.role('owner')];
-  const patient = [d.authed, d.role('patient')];
+  const owner = [d.authed];
+  const patient = [d.authed];
   const mine = async (req: Request) => {
     const p = await db.pharmacy.findUnique({ where: { ownerId: req.user!.id } });
     if (!p) throw new HttpError(404, 'no pharmacy yet');

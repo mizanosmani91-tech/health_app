@@ -29,7 +29,7 @@ class _RequestsPageState extends State<RequestsPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('অনুরোধ', style: TextStyle(fontWeight: FontWeight.w600))),
       body: Q<List<Map<String, dynamic>>>(
-        load: () async => (await o.api.list('/requests')).where((r) => r['status'] == _f).toList(),
+        load: () async => (await o.api.list('/requests', query: {'as': 'owner'})).where((r) => r['status'] == _f).toList(),
         builder: (c, rows) => ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 140), children: [
           Row(children: [
             Chip2('নতুন', selected: _f == 'new', onTap: () => setState(() => _f = 'new')),

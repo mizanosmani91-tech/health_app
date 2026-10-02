@@ -143,6 +143,14 @@ class _SettingsPageState extends State<SettingsPage> {
             _row(Icons.language, Tint.pink, 'ভাষা', trailing: const Muted('বাংলা', size: 14)),
             _row(Icons.delete, Tint.green, 'রিসাইকেল বিন', onTap: () => context.push(const _BinPage())),
           ])),
+          if (!s.offline)
+            Card2(
+              padding: EdgeInsets.zero,
+              margin: const EdgeInsets.only(bottom: 12),
+              child: _row(Icons.storefront, Tint.purple, 'ফার্মেসি মালিক মোডে যান',
+                  sub: 'আপনার দোকান যোগ করুন বা স্টক/অনুরোধ দেখুন',
+                  onTap: () => s.switchRole(UserRole.owner)),
+            ),
           Card2(
             color: const Color(0xFFFFE9E0),
             onTap: () async { if (await confirm(context, 'লগআউট করবেন?')) s.signOut(); },

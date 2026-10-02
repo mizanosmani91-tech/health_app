@@ -53,12 +53,40 @@ test('rejects bad Google token and unauthenticated calls', async () => {
   assert.equal((await call('GET', '/me', { token: 'abc.def.ghi' })).status, 401);
 });
 
-test('role is write-once and enforced per route', async () => {
+test('role is a switchable mode, access is decided by ownership', async () => {
   const t = await login('u1', 'patient');
-  assert.equal((await call('POST', '/me/role', { token: t, body: { role: 'owner' } })).status, 409);
-  assert.equal((await call('GET', '/stock', { token: t })).status, 403);
-  const o = await login('u2', 'owner');
-  assert.equal((await call('POST', '/search', { token: o, body: { names: ['x'] } })).status, 403);
+  // a patient has no pharmacy, so owner-only data simply does not exist for them
+  assert.equal((await call('GET', '/stock', { token: t })).status, 404);
+  assert.equal((await call('GET', '/requests?as=owner', { token: t })).status, 404);
+  // switching the mode is allowed any time and is just a preference
+  const sw = await call('POST', '/me/role', { token: t, body: { role: 'owner' } });
+  assert.equal(sw.status, 200);
+  assert.equal((await call('GET', '/me', { token: t })).json.role, 'owner');
+  assert.equal((await call('POST', '/me/role', { token: t, body: { role: 'bogus' } })).status, 400);
+});
+
+test('one account can be both pharmacy owner and patient', async () => {
+  const both = await login('both1', 'owner');
+  const other = await login('own8', 'owner');
+  const shopB = await call('POST', '/pharmacy', { token: other, body: shop('Other shop') });
+  await call('POST', `/admin/pharmacies/${shopB.json.id}/status`, { admin: ADMIN, body: { status: 'verified' } });
+  await call('POST', '/stock', { token: other, body: { name: 'Napa', status: 'in' } });
+  await call('POST', '/pharmacy', { token: both, body: shop('My shop') });
+  // as a patient (same account) search other shops and send a request
+  await call('POST', '/me/role', { token: both, body: { role: 'patient' } });
+  const found = await call('POST', '/search', { token: both, body: { names: ['Napa'] } });
+  assert.equal(found.status, 200);
+  assert.equal(found.json[0].status, 'in');
+  const rq = await call('POST', '/requests', { token: both, body: { pharmacyId: shopB.json.id, patientName: 'Me', items: [{ name: 'Napa' }] } });
+  assert.equal(rq.status, 201);
+  // the two views stay separate: my sent requests vs requests to my shop
+  assert.equal((await call('GET', '/requests', { token: both })).json.length, 1);
+  assert.equal((await call('GET', '/requests?as=owner', { token: both })).json.length, 0);
+  // the other shop sees it, and I (not its owner) cannot answer it
+  assert.equal((await call('GET', '/requests?as=owner', { token: other })).json.length, 1);
+  assert.equal((await call('POST', `/requests/${rq.json.id}/reply`, { token: both, body: { items: ['yes'] } })).status, 404);
+  // my own shop's stock is untouched by the patient search results
+  assert.equal((await call('GET', '/stock', { token: both })).json.length, 0);
 });
 
 test('full pharmacy flow: register, verify, stock, search privacy, request, reply', async () => {
@@ -81,7 +109,7 @@ test('full pharmacy flow: register, verify, stock, search privacy, request, repl
   await call('POST', '/stock', { token: owner, body: { name: 'ওমিপ্রাজল ২০', status: 'out' } });
 
   let search = await call('POST', '/search', { token: patient, body: { names: ['নাপা'] } });
-  assert.deepEqual(search.json, []);
+  assert.ok(!search.json.some((r: any) => r.pharmacyId === pid), 'unverified shop must be invisible to patients');
   assert.equal((await call('POST', '/requests', { token: patient, body: { pharmacyId: pid, patientName: 'করিম', items: [{ name: 'নাপা' }] } })).status, 404);
 
   assert.equal((await call('POST', `/admin/pharmacies/${pid}/status`, { body: { status: 'verified' } })).status, 401);
@@ -89,7 +117,7 @@ test('full pharmacy flow: register, verify, stock, search privacy, request, repl
   assert.equal((await fetch(`${base}/admin/pharmacies/${pid}/license`, { headers: { 'x-admin-key': ADMIN } })).status, 200);
 
   search = await call('POST', '/search', { token: patient, body: { names: ['নাপা', 'ওমিপ্রাজল', 'অজানা'] } });
-  const st = Object.fromEntries(search.json.map((r: any) => [r.medicineName, r.status]));
+  const st = Object.fromEntries(search.json.filter((r: any) => r.pharmacyId === pid).map((r: any) => [r.medicineName, r.status]));
   assert.deepEqual(st, { 'নাপা': 'in', 'ওমিপ্রাজল': 'out', 'অজানা': 'unknown' });
   assert.ok(!/buyPrice|sellPrice|qty|"45"|:45|:38/.test(JSON.stringify(search.json)), 'no price/qty leaks to patients');
 
@@ -97,9 +125,9 @@ test('full pharmacy flow: register, verify, stock, search privacy, request, repl
   assert.equal(rq.status, 201);
   const other = await login('pat2', 'patient');
   assert.equal((await call('GET', `/requests/${rq.json.id}`, { token: other })).status, 404);
-  assert.equal((await call('POST', `/requests/${rq.json.id}/reply`, { token: patient, body: { items: ['yes', 'no'] } })).status, 403);
+  assert.equal((await call('POST', `/requests/${rq.json.id}/reply`, { token: patient, body: { items: ['yes', 'no'] } })).status, 404);
 
-  const ownerList = await call('GET', '/requests', { token: owner });
+  const ownerList = await call('GET', '/requests?as=owner', { token: owner });
   assert.equal(ownerList.json.length, 1);
   assert.equal(ownerList.json[0].status, 'new');
   const rep = await call('POST', `/requests/${rq.json.id}/reply`, { token: owner, body: { items: ['yes', 'no'], message: 'বিকেলে আসুন' } });
@@ -120,7 +148,7 @@ test('full pharmacy flow: register, verify, stock, search privacy, request, repl
   // stock status change is visible to patients immediately
   await call('PATCH', `/stock/${s1.json.id}`, { token: owner, body: { status: 'low' } });
   const again = await call('POST', '/search', { token: patient, body: { names: ['নাপা'] } });
-  assert.equal(again.json[0].status, 'low');
+  assert.equal(again.json.find((r: any) => r.pharmacyId === pid).status, 'low');
 });
 
 test('barcode: look up by scanned code, unique per pharmacy, owner-only', async () => {
@@ -144,7 +172,7 @@ test('barcode: look up by scanned code, unique per pharmacy, owner-only', async 
   assert.equal((await call('GET', '/stock/barcode/8940001285711', { token: o2 })).status, 404);
   assert.equal((await call('POST', '/stock', { token: o2, body: { name: 'Mine', barcode: '8940001285711' } })).status, 201);
   const pat = await login('pat9', 'patient');
-  assert.equal((await call('GET', '/stock/barcode/8940001285711', { token: pat })).status, 403);
+  assert.equal((await call('GET', '/stock/barcode/8940001285711', { token: pat })).status, 404); // a patient has no pharmacy, so no product list
   // patients' search never exposes the barcode
   assert.ok(!JSON.stringify((await call('POST', '/search', { token: pat, body: { names: ['Ace'] } })).json).includes('8940001285711'));
 });
