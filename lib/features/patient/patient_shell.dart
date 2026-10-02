@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'reminder_check_page.dart';
+import '../../services/prefs.dart';
 import '../../core/widgets.dart';
 import '../../services/notification_service.dart';
 import 'home_page.dart';
@@ -21,6 +23,14 @@ class _PatientShellState extends State<PatientShell> {
   void initState() {
     super.initState();
     NotificationService.instance.requestPermission();
+    // First time only: walk the person through the reminder settings (home keeps a warning card afterwards).
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (Prefs.reminderWizardSeen || !mounted) return;
+      final h = await NotificationService.instance.health();
+      if (h.allGood || !mounted) return;
+      Prefs.reminderWizardSeen = true;
+      context.push(const ReminderCheckPage());
+    });
   }
 
   void go(int i) {

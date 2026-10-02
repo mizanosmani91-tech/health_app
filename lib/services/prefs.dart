@@ -26,6 +26,14 @@ class Prefs {
   static int? get lastBackupMs => _p.getInt('last_backup');
   static set lastBackupMs(int? v) => v == null ? _p.remove('last_backup') : _p.setInt('last_backup', v);
 
+  /// The phone-maker "autostart" setting can't be read by apps, so we remember that the person said they did it.
+  static bool get autostartDone => _p.getBool('autostart_done') ?? false;
+  static set autostartDone(bool v) => _p.setBool('autostart_done', v);
+  static bool get reminderTestOk => _p.getBool('reminder_test_ok') ?? false;
+  static set reminderTestOk(bool v) => _p.setBool('reminder_test_ok', v);
+  static bool get reminderWizardSeen => _p.getBool('reminder_wizard_seen') ?? false;
+  static set reminderWizardSeen(bool v) => _p.setBool('reminder_wizard_seen', v);
+
   static bool get driveLinked => _p.getBool('drive_linked') ?? false;
   static set driveLinked(bool v) => _p.setBool('drive_linked', v);
 
