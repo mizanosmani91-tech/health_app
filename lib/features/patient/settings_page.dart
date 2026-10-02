@@ -8,6 +8,7 @@ import '../../data/local_db.dart';
 import '../../services/app_state.dart';
 import '../../services/auth_service.dart';
 import '../../services/backup_service.dart';
+import 'reminder_check_page.dart';
 import '../../services/notification_service.dart';
 import '../../services/prefs.dart';
 import 'member_form.dart';
@@ -113,6 +114,7 @@ class _SettingsPageState extends State<SettingsPage> {
               value: Prefs.remindersOn,
               onChanged: (v) async { Prefs.remindersOn = v; await NotificationService.instance.rescheduleAll(); setState(() {}); },
             )),
+            _row(Icons.verified, Tint.green, 'রিমাইন্ডার ঠিকঠাক কাজ করছে কিনা দেখুন', onTap: () => context.push(const ReminderCheckPage())),
             _row(Icons.wb_sunny, Tint.amber, 'সকালের ওষুধের সময়', trailing: Muted(t('morning'), size: 14), onTap: () => _time('morning', 'সকালের')),
             _row(Icons.light_mode, Tint.amber, 'দুপুরের ওষুধের সময়', trailing: Muted(t('noon'), size: 14), onTap: () => _time('noon', 'দুপুরের')),
             _row(Icons.nightlight, Tint.purple, 'রাতের ওষুধের সময়', trailing: Muted(t('night'), size: 14), onTap: () => _time('night', 'রাতের')),

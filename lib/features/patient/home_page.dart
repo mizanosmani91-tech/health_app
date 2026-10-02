@@ -8,7 +8,9 @@ import '../../data/local_db.dart';
 import '../../data/models.dart';
 import '../../services/app_state.dart';
 import '../../services/prefs.dart';
+import '../../services/notification_service.dart';
 import 'medicine_form.dart';
+import 'reminder_check_page.dart';
 import 'member_form.dart';
 import 'test_form.dart';
 import 'visit_form.dart';
@@ -109,6 +111,7 @@ class HomePage extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
             child: Column(children: [
+              const _ReminderWarning(),
               for (final x in pending.take(3))
                 Card2(
                   margin: const EdgeInsets.only(bottom: 12),
@@ -243,5 +246,28 @@ class _Quick extends StatelessWidget {
             ),
           ),
         ),
+      );
+}
+
+/// Shown only while Android would stop a dose reminder from ringing on time.
+class _ReminderWarning extends StatelessWidget {
+  const _ReminderWarning();
+  @override
+  Widget build(BuildContext context) => FutureBuilder<ReminderHealth>(
+        future: NotificationService.instance.health(),
+        builder: (c, snap) {
+          final h = snap.data;
+          if (h == null || h.allGood || !Prefs.remindersOn) return const SizedBox.shrink();
+          return Card2(
+            color: const Color(0xFFFFF1D6),
+            margin: const EdgeInsets.only(bottom: 12),
+            onTap: () => context.push(const ReminderCheckPage()),
+            child: const Row(children: [
+              Icon(Icons.warning_amber, color: Color(0xFF9A6200)),
+              SizedBox(width: 10),
+              Expanded(child: Text('ওষুধের রিমাইন্ডার পুরোপুরি চালু নেই — ঠিক করতে এখানে চাপুন', style: TextStyle(height: 1.4, fontWeight: FontWeight.w500))),
+            ]),
+          );
+        },
       );
 }
