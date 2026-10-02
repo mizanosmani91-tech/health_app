@@ -8,6 +8,7 @@ import '../../services/app_state.dart';
 import '../../services/api.dart';
 import '../../services/auth_service.dart';
 import '../../services/images.dart';
+import '../../services/location_service.dart';
 
 class OwnerRegisterScreen extends StatefulWidget {
   const OwnerRegisterScreen({super.key});
@@ -19,6 +20,7 @@ class _OwnerRegisterScreenState extends State<OwnerRegisterScreen> {
   final _key = GlobalKey<FormState>();
   final _name = TextEditingController(), _addr = TextEditingController(), _phone = TextEditingController(), _lic = TextEditingController();
   String? _licImage;
+  double? _lat, _lng;
   bool _busy = false;
 
   String? _req(String? v) => (v ?? '').trim().isEmpty ? 'এটি লিখতে হবে' : null;
@@ -35,6 +37,8 @@ class _OwnerRegisterScreenState extends State<OwnerRegisterScreen> {
         'name': _name.text.trim(), 'address': _addr.text.trim(),
         'phone': en(_phone.text.trim()), 'licenseNo': en(_lic.text.trim()),
         'licenseImage': base64Encode(bytes),
+        if (_lat != null) 'lat': _lat,
+        if (_lng != null) 'lng': _lng,
       });
       if (mounted) await context.read<AppState>().setupDone();
     } catch (e) {
@@ -53,6 +57,15 @@ class _OwnerRegisterScreenState extends State<OwnerRegisterScreen> {
           children: [
             Field('ফার্মেসির নাম', controller: _name, icon: Icons.storefront, validator: _req),
             Field('ঠিকানা', controller: _addr, icon: Icons.location_on, validator: _req),
+            OutlineButton2(_lat == null ? 'দোকানে বসে লোকেশন নিন (কাছের গ্রাহক খুঁজে পাবে)' : 'লোকেশন নেওয়া হয়েছে ✓', icon: Icons.my_location, onTap: () async {
+              try {
+                final p = await LocationService.current();
+                setState(() { _lat = p.lat; _lng = p.lng; });
+              } catch (e) {
+                if (mounted) context.toast('$e');
+              }
+            }),
+            const SizedBox(height: 12),
             Field('মোবাইল নম্বর', controller: _phone, icon: Icons.call, keyboard: TextInputType.phone, validator: _req),
             Field('ড্রাগ লাইসেন্স নম্বর', controller: _lic, icon: Icons.badge, validator: _req),
             GestureDetector(

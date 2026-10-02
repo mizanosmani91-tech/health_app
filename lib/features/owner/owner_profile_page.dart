@@ -6,6 +6,7 @@ import '../../core/widgets.dart';
 import '../../services/app_state.dart';
 import '../../services/auth_service.dart';
 import 'owner_ctx.dart';
+import '../../services/location_service.dart';
 
 class OwnerProfilePage extends StatelessWidget {
   const OwnerProfilePage({super.key});
@@ -77,6 +78,15 @@ class OwnerProfilePage extends StatelessWidget {
         child: Column(children: [
           Card2(padding: EdgeInsets.zero, margin: const EdgeInsets.only(bottom: 12), child: Column(children: [
             row(Icons.location_on, Tint.purple, p['address'], onTap: () => _edit(context, o, 'address', 'ঠিকানা')),
+            row(Icons.my_location, Tint.blue, 'দোকানের লোকেশন', sub: p['lat'] != null ? 'দেওয়া আছে (বদলাতে চাপুন)' : 'দেওয়া নেই — কাছের গ্রাহক আপনাকে খুঁজে পাবে না', onTap: () async {
+              try {
+                final pos = await LocationService.current();
+                await o.updatePharmacy({'lat': pos.lat, 'lng': pos.lng});
+                if (context.mounted) context.toast('লোকেশন সংরক্ষণ হয়েছে');
+              } catch (e) {
+                if (context.mounted) context.toast('$e');
+              }
+            }),
             row(Icons.call, Tint.green, p['phone'], onTap: () => _edit(context, o, 'phone', 'মোবাইল নম্বর')),
             row(Icons.schedule, Tint.blue, 'খোলা: ${hm(p['openFrom'])} — ${hm(p['openTo'])}', onTap: () async {
               await _time(context, o, 'openFrom', 'খোলার সময়');

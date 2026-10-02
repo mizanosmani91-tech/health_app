@@ -5,6 +5,7 @@ import '../../core/widgets.dart';
 import '../../data/local_db.dart';
 import '../../data/models.dart';
 import '../../services/app_state.dart';
+import '../../services/drug_search.dart';
 
 class MedicineForm extends StatefulWidget {
   final Member member;
@@ -77,7 +78,13 @@ class _MedicineFormState extends State<MedicineForm> {
           children: [
             Autocomplete<String>(
               initialValue: TextEditingValue(text: _name.text),
-              optionsBuilder: (v) => v.text.isEmpty ? const [] : _names.where((n) => n.contains(v.text)),
+              optionsBuilder: (v) async {
+                if (v.text.isEmpty) return const <String>[];
+                final mine = _names.where((n) => n.contains(v.text)).toList();
+                await Future.delayed(const Duration(milliseconds: 300)); // let typing settle before asking the server
+                final hits = await searchDrugs(v.text);
+                return {...mine, ...hits.map((h) => h.label)};
+              },
               onSelected: (v) => _name.text = v,
               fieldViewBuilder: (c, ctrl, focus, _) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),

@@ -9,6 +9,7 @@ import '../../data/local_db.dart';
 import '../../data/models.dart';
 import '../../services/app_state.dart';
 import '../../services/api.dart';
+import '../../services/location_service.dart';
 
 String _waNumber(String phone) {
   final d = en(phone).replaceAll(RegExp(r'\D'), '');
@@ -29,6 +30,7 @@ class _PharmacyPageState extends State<PharmacyPage> {
   int _tab = 0;
   final Set<String> _selected = {};
   final _extra = TextEditingController();
+  Future<Map<String, dynamic>>? _near;
 
   @override
   Widget build(BuildContext context) {
@@ -39,15 +41,94 @@ class _PharmacyPageState extends State<PharmacyPage> {
         Row(children: [
           Chip2('আমার ফার্মেসি', selected: _tab == 0, onTap: () => setState(() => _tab = 0)),
           const SizedBox(width: 8),
+          if (online) Chip2('কাছাকাছি', selected: _tab == 3, onTap: () => setState(() => _tab = 3)),
+          if (online) const SizedBox(width: 8),
           if (online) Chip2('কোথায় কী আছে', selected: _tab == 1, onTap: () => setState(() => _tab = 1)),
           if (online) const SizedBox(width: 8),
           if (online) Chip2('আমার অনুরোধ', selected: _tab == 2, onTap: () => setState(() => _tab = 2)),
         ]),
         const SizedBox(height: 12),
-        if (_tab == 0) _mine(context) else if (_tab == 1) _search(context) else _requests(context),
+        if (_tab == 0) _mine(context) else if (_tab == 3) _nearby(context) else if (_tab == 1) _search(context) else _requests(context),
       ]),
     );
   }
+
+  // ---- nearby (GPS, one-shot) ---------------------------------------------
+  Future<Map<String, dynamic>> _findNear() async {
+    final pos = await LocationService.current();
+    final r = await Api.instance.get('/pharmacies/nearby', query: {'lat': '${pos.lat}', 'lng': '${pos.lng}', 'km': '5'});
+    return (r as Map).cast<String, dynamic>();
+  }
+
+  Future<void> _keep(Map<String, dynamic> p) async {
+    await LocalDb.instance.savePharmacy(FavPharmacy(name: '${p['name']}', area: '${p['address'] ?? ''}', phone: '${p['phone'] ?? ''}'));
+    if (!mounted) return;
+    context.read<AppState>().touch();
+    context.toast('"${p['name']}" আপনার তালিকায় রাখা হয়েছে');
+  }
+
+  Future<void> _openMap(Map<String, dynamic> p) =>
+      launchUrl(Uri.parse('https://www.google.com/maps/search/?api=1&query=${p['lat']},${p['lng']}'), mode: LaunchMode.externalApplication);
+
+  Widget _placeCard(BuildContext context, Map<String, dynamic> p, {required bool registered}) {
+    final phone = '${p['phone'] ?? ''}';
+    return Card2(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          IconTile(registered ? Icons.verified : Icons.local_pharmacy, registered ? Tint.green : Tint.blue),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('${p['name']}', style: const TextStyle(fontWeight: FontWeight.w600)),
+            Muted(['${bn(p['distanceKm'])} কি.মি. দূরে', if ((p['address'] ?? '').toString().isNotEmpty) '${p['address']}'].join(' · ')),
+          ])),
+          if (registered) (p['isOpen'] == true ? const Pill.ok('খোলা') : const Pill.no('বন্ধ')),
+        ]),
+        const SizedBox(height: 12),
+        Row(children: [
+          if (phone.isNotEmpty) ...[
+            Expanded(child: OutlineButton2('কল', icon: Icons.call, onTap: () => callPhone(phone))),
+            const SizedBox(width: 8),
+          ],
+          Expanded(child: OutlineButton2('মানচিত্র', icon: Icons.map, onTap: () => _openMap(p))),
+          const SizedBox(width: 8),
+          Expanded(child: OutlineButton2('রাখুন', icon: Icons.add, onTap: () => _keep(p))),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _nearby(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Muted('আপনার এখনকার লোকেশন শুধু খোঁজার সময় ব্যবহার হয়, কোথাও জমা থাকে না।', size: 13),
+        const SizedBox(height: 10),
+        PrimaryButton(_near == null ? 'আমার কাছের ফার্মেসি খুঁজুন' : 'আবার খুঁজুন', icon: Icons.my_location, onTap: () => setState(() => _near = _findNear())),
+        const SizedBox(height: 14),
+        if (_near != null)
+          FutureBuilder<Map<String, dynamic>>(
+            future: _near,
+            builder: (c, s) {
+              if (s.connectionState != ConnectionState.done) return const Padding(padding: EdgeInsets.all(30), child: Center(child: CircularProgressIndicator()));
+              if (s.hasError) return Muted('${s.error is ApiException || s.error is LocationException ? s.error : 'খোঁজা যায়নি, ইন্টারনেট দেখুন'}');
+              final reg = (s.data!['registered'] as List).cast<Map<String, dynamic>>();
+              final map = (s.data!['map'] as List).cast<Map<String, dynamic>>();
+              if (reg.isEmpty && map.isEmpty) return const Empty(Icons.storefront, '৫ কি.মি.-এর মধ্যে কোনো ফার্মেসি পাওয়া যায়নি।');
+              return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                if (reg.isNotEmpty) ...[
+                  const SectionTitle('এই অ্যাপে যুক্ত ফার্মেসি'),
+                  const Muted('এদের কাছে অনুরোধ পাঠানো ও ওষুধ আছে কিনা দেখা যায়।', size: 13),
+                  const SizedBox(height: 8),
+                  for (final p in reg) _placeCard(c, p, registered: true),
+                ],
+                if (map.isNotEmpty) ...[
+                  const SectionTitle('মানচিত্রে পাওয়া ফার্মেসি'),
+                  const Muted('ওপেনস্ট্রিটম্যাপ থেকে। ফোন নম্বর বা সময় নাও থাকতে পারে, কল করে নিশ্চিত হয়ে নিন।', size: 13),
+                  const SizedBox(height: 8),
+                  for (final p in map) _placeCard(c, p, registered: false),
+                ],
+              ]);
+            },
+          ),
+      ]);
 
   // ---- my pharmacies (local) ---------------------------------------------
   Widget _mine(BuildContext context) {

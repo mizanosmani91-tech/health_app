@@ -8,6 +8,7 @@ import '../../data/catalog.dart';
 import '../../services/api.dart';
 import 'scan_page.dart';
 import 'owner_ctx.dart';
+import '../../services/drug_search.dart';
 
 class StockPage extends StatefulWidget {
   const StockPage({super.key});
@@ -191,6 +192,14 @@ class _StockFormPageState extends State<StockFormPage> {
   void _search(String q) {
     final t = q.trim();
     setState(() => _hits = t.length < 2 ? [] : medicineCatalog.where((m) => m.name.contains(t) || m.generic.contains(t)).take(6).toList());
+    if (t.length < 2) return;
+    searchDrugs(t).then((more) {
+      if (!mounted || _name.text.trim() != t) return; // the text moved on
+      setState(() => _hits = [
+            ..._hits,
+            for (final h in more) CatalogItem(h.label, h.generic, h.manufacturer, h.form),
+          ].take(12).toList());
+    });
   }
 
   Future<void> _save(OwnerCtx o) async {
