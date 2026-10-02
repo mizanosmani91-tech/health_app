@@ -47,3 +47,9 @@ curl -H "x-admin-key: $KEY" https://DOMAIN/admin/catalog/8940001285711          
 curl -X PUT -H "x-admin-key: $KEY" -H 'content-type: application/json' -d '{"name":"Ace Plus 500 mg","genericName":"Paracetamol","form":"Tablet","manufacturer":"Square"}' https://DOMAIN/admin/catalog/8940001285711   # pin a corrected entry
 curl -X DELETE -H "x-admin-key: $KEY" https://DOMAIN/admin/catalog/8940001285711           # remove the pin
 ```
+
+## প্রেসক্রিপশনের ছবি পড়া (ঐচ্ছিক)
+
+`POST /prescriptions/parse` — ছবি থেকে শুধু একটা **খসড়া** ফেরত দেয় (ছবি/ফলাফল সার্ভারে জমা হয় না)। চালু করতে `/etc/health-diary.env`-এ
+`ANTHROPIC_API_KEY=...` বসিয়ে `systemctl restart health-diary` করুন (কী কখনো রিপোতে/চ্যাটে নয়)। না থাকলে এন্ডপয়েন্ট 503 দেয়।
+`SCAN_DAILY_LIMIT` (ডিফল্ট ১০) প্রতি ব্যবহারকারীর দৈনিক সীমা, `ANTHROPIC_MODEL` ঐচ্ছিক। `update.sh` নতুন মাইগ্রেশন নিজেই চালায়।

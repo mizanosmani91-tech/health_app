@@ -7,6 +7,8 @@ import '../../core/widgets.dart';
 import '../../data/local_db.dart';
 import '../../data/models.dart';
 import '../../services/app_state.dart';
+import '../../core/config.dart';
+import 'prescription_scan_page.dart';
 import 'test_form.dart';
 import 'visit_form.dart';
 
@@ -50,6 +52,9 @@ class _VisitsPageState extends State<VisitsPage> {
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 ListTile(leading: const Icon(Icons.medical_services), title: const Text('নতুন ভিজিট'),
                     onTap: () { Navigator.pop(c); context.push(VisitForm(member: me)); }),
+                if (Config.hasBackend)
+                  ListTile(leading: const Icon(Icons.document_scanner), title: const Text('প্রেসক্রিপশনের ছবি থেকে'),
+                      onTap: () { Navigator.pop(c); context.push(PrescriptionScanPage(member: me)); }),
                 ListTile(leading: const Icon(Icons.science), title: const Text('নতুন টেস্ট'),
                     onTap: () { Navigator.pop(c); context.push(TestForm(member: me)); }),
               ]),
