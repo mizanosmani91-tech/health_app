@@ -29,7 +29,7 @@ class NotificationService {
       tz.setLocalLocation(tz.getLocation('Asia/Dhaka'));
     }
     await _plugin.initialize(
-      settings: const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher')),
+      settings: const InitializationSettings(android: AndroidInitializationSettings('ic_stat_notify')),
     );
     _ready = true;
   }
@@ -130,6 +130,11 @@ class NotificationService {
   Future<void> askNotifications() => Permission.notification.request();
   Future<void> askExactAlarms() => Permission.scheduleExactAlarm.request();
   Future<void> askBattery() => Permission.ignoreBatteryOptimizations.request();
+
+  /// Shows a notification immediately: proves the permission, channel and icon work (separate from alarms).
+  Future<void> showNow() => _plugin.show(
+        id: 9999998, title: 'পরীক্ষা: নোটিফিকেশন কাজ করছে', body: 'এখন ১ মিনিট পরের রিমাইন্ডারের জন্য অপেক্ষা করুন',
+        notificationDetails: _details('doses', 'ওষুধের সময়'));
 
   /// Fires one real reminder through the same path as dose alarms, [seconds] from now.
   Future<void> sendTest({int seconds = 60}) async {

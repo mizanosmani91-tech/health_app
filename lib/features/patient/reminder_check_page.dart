@@ -97,10 +97,11 @@ class _ReminderCheckPageState extends State<ReminderCheckPage> with WidgetsBindi
             confirm: 'আমি চালু করেছি', onConfirm: () async { Prefs.autostartDone = true; }),
         _Step.test => _Info(Icons.fact_check, 'শেষ ধাপ: পরীক্ষা',
             _testSent
-                ? 'এখন অ্যাপটা বন্ধ করুন (Recent apps থেকেও সরিয়ে দিন) এবং ১ মিনিট অপেক্ষা করুন। নোটিফিকেশন এলে নিচের "পেয়েছি" চাপুন।'
-                : '"পরীক্ষা পাঠান" চাপলে ১ মিনিট পরে একটা রিমাইন্ডার আসবে। ওটা এলেই সব ঠিক।',
+                ? 'এইমাত্র একটা নোটিফিকেশন এসেছে? না এলে নোটিফিকেশনের অনুমতি/ফোনের সেটিংস সমস্যা। এবার অ্যাপটা বন্ধ করুন (Recent apps থেকেও সরিয়ে দিন) এবং ১ মিনিট অপেক্ষা করুন। দ্বিতীয় নোটিফিকেশন এলে নিচের "পেয়েছি" চাপুন।'
+                : '"পরীক্ষা পাঠান" চাপলে এখনই একটা নোটিফিকেশন আসবে, আর ১ মিনিট পরে আরেকটা। দ্বিতীয়টা অ্যাপ বন্ধ অবস্থায় এলেই সব ঠিক।',
             _testSent ? 'আবার পাঠান' : 'পরীক্ষা পাঠান', () async {
               Prefs.reminderWizardSeen = true;
+              await NotificationService.instance.showNow();
               await NotificationService.instance.sendTest();
               _testSent = true;
             },
@@ -138,7 +139,14 @@ class _ReminderCheckPageState extends State<ReminderCheckPage> with WidgetsBindi
               const SizedBox(height: 10),
               Text(i.body, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15.5, height: 1.6)),
               const SizedBox(height: 24),
-              PrimaryButton(i.button, onTap: () async { await i.action(); await _refresh(); }),
+              PrimaryButton(i.button, onTap: () async {
+                try {
+                  await i.action();
+                } catch (e) {
+                  if (c.mounted) c.toast('ব্যর্থ: $e'); // show the real reason instead of failing silently
+                }
+                await _refresh();
+              }),
               if (i.confirm != null) ...[
                 const SizedBox(height: 10),
                 OutlineButton2(i.confirm!, onTap: () async { await i.onConfirm!(); await _refresh(); }),
