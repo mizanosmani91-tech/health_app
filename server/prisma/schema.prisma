@@ -50,6 +50,9 @@ model User {
   googleSub  String   @unique
   email      String?
   name       String?
+  phone      String?
+  birthYear  Int?
+  bloodGroup String?
   role       Role?
   createdAt  DateTime @default(now())
   pharmacy   Pharmacy?

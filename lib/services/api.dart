@@ -49,6 +49,7 @@ class Api {
 
   Future<dynamic> get(String p, {Map<String, String>? query}) => _send('GET', p, query: query);
   Future<dynamic> post(String p, [Object? body]) => _send('POST', p, body: body ?? {});
+  Future<dynamic> put(String p, Object body) => _send('PUT', p, body: body);
   Future<dynamic> patch(String p, Object body) => _send('PATCH', p, body: body);
   Future<dynamic> delete(String p) => _send('DELETE', p);
 

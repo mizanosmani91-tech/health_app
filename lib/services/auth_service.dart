@@ -47,6 +47,18 @@ class AuthService {
     return r == null ? null : (r == 'owner' ? UserRole.owner : UserRole.patient);
   }
 
+  /// Basic account details kept on the server (name, mobile, birth year, blood group). Null if offline.
+  Future<Map<String, dynamic>?> loadProfile() async {
+    try {
+      return await _api.get('/me') as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> saveProfile({required String name, required String phone, int? birthYear, String bloodGroup = ''}) =>
+      _api.put('/me/profile', {'name': name, 'phone': phone, 'birthYear': birthYear, 'bloodGroup': bloodGroup});
+
   Future<void> saveRole(UserRole role) =>
       _api.post('/me/role', {'role': role == UserRole.owner ? 'owner' : 'patient'});
 

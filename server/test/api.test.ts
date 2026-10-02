@@ -316,3 +316,26 @@ test('prescription parse: consent, draft sanitising, daily cap, no model configu
   const r = await call('POST', '/prescriptions/parse', { token: t2, body: { consent: true, mediaType: 'image/jpeg', image: Buffer.alloc(300, 7).toString('base64') } });
   assert.equal(r.status, 503);
 });
+
+test('account profile: saved on the server, validated, survives re-login', async () => {
+  // own app instance => own auth rate-limit window
+  const app = createApp({ db: prisma, verifyGoogle, jwtSecret: 'x'.repeat(40) });
+  const srv = await new Promise<Server>((r) => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
+  const url = `http://127.0.0.1:${(srv.address() as AddressInfo).port}`;
+  const call = async (method: string, path: string, o: { token?: string; body?: unknown } = {}) => {
+    const r = await fetch(url + path, { method, headers: { 'content-type': 'application/json', ...(o.token ? { authorization: `Bearer ${o.token}` } : {}) }, body: o.body ? JSON.stringify(o.body) : undefined });
+    return { status: r.status, json: await r.json() as any };
+  };
+  const sub = 'profile1';
+  const tok = (await call('POST', '/auth/google', { body: { idToken: `good:${sub}:${sub}` } })).json.token;
+  assert.equal((await call('PUT', '/me/profile', { token: tok, body: { name: 'রহিম', phone: '12ab', birthYear: 1990, bloodGroup: 'O+' } })).status, 400);
+  assert.equal((await call('PUT', '/me/profile', { token: tok, body: { name: 'রহিম', phone: '01712345678', birthYear: 1990, bloodGroup: 'Z+' } })).status, 400);
+  const ok = await call('PUT', '/me/profile', { token: tok, body: { name: 'রহিম', phone: '01712345678', birthYear: '1990', bloodGroup: 'O+' } });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.json.phone, '01712345678');
+  const again = await call('POST', '/auth/google', { body: { idToken: `good:${sub}:${sub}` } });
+  assert.equal(again.json.user.birthYear, 1990);
+  assert.equal(again.json.user.bloodGroup, 'O+');
+  assert.equal((await call('GET', '/me', { token: tok })).json.name, 'রহিম');
+  srv.close();
+});

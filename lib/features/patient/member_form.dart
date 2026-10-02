@@ -5,7 +5,9 @@ import '../../core/bn.dart';
 import '../../core/widgets.dart';
 import '../../data/local_db.dart';
 import '../../data/models.dart';
+import '../../core/config.dart';
 import '../../services/app_state.dart';
+import '../../services/auth_service.dart';
 import '../../services/images.dart';
 
 const bloodGroups = ['A+', 'A−', 'B+', 'B−', 'O+', 'O−', 'AB+', 'AB−'];
@@ -28,13 +30,30 @@ class _MemberFormState extends State<MemberForm> {
   late final _allergy = TextEditingController(text: widget.member?.allergy);
   late String _blood = widget.member?.bloodGroup ?? '';
   late String _relation = widget.member?.relation ?? (widget.isSelf ? 'নিজে' : '');
+  late final _phone = TextEditingController();
   String? _photo;
   bool _saving = false;
+  bool get _isSelf => widget.member?.isSelf ?? widget.isSelf;
 
   @override
   void initState() {
     super.initState();
     _photo = widget.member?.photoPath;
+    if (_isSelf && Config.hasBackend) _loadAccount();
+  }
+
+  /// The server keeps name, mobile, birth year and blood group, so a reinstall can prefill them.
+  Future<void> _loadAccount() async {
+    final u = await AuthService.instance.loadProfile();
+    if (u == null || !mounted) return;
+    setState(() {
+      _phone.text = (u['phone'] as String?) ?? '';
+      if (widget.member == null) {
+        if (_name.text.isEmpty) _name.text = (u['name'] as String?) ?? '';
+        if (_year.text.isEmpty && u['birthYear'] != null) _year.text = bn(u['birthYear'] as int);
+        if (_blood.isEmpty) _blood = ((u['bloodGroup'] as String?) ?? '').replaceAll('-', '−');
+      }
+    });
   }
 
   Future<void> _save() async {
@@ -52,6 +71,13 @@ class _MemberFormState extends State<MemberForm> {
       isSelf: widget.member?.isSelf ?? widget.isSelf,
     );
     final id = await LocalDb.instance.saveMember(m);
+    if (_isSelf && Config.hasBackend) {
+      try {
+        await AuthService.instance.saveProfile(name: m.name, phone: en(_phone.text.trim()), birthYear: yr, bloodGroup: _blood.replaceAll('−', '-'));
+      } catch (_) {
+        // offline: the local profile is saved; the account copy is refreshed on the next edit
+      }
+    }
     if (!mounted) return;
     final state = context.read<AppState>();
     await state.refresh();
@@ -91,6 +117,9 @@ class _MemberFormState extends State<MemberForm> {
             ),
           ),
           Field('পুরো নাম', controller: _name, icon: Icons.person, validator: (v) => (v ?? '').trim().isEmpty ? 'নাম লিখুন' : null),
+          if (_isSelf && Config.hasBackend)
+            Field('মোবাইল নম্বর', controller: _phone, icon: Icons.phone, keyboard: TextInputType.phone,
+                validator: (v) => RegExp(r'^\+?[0-9]{10,15}$').hasMatch(en((v ?? '').trim())) ? null : 'সঠিক মোবাইল নম্বর লিখুন'),
           if (!widget.isSelf && !(widget.member?.isSelf ?? false)) ...[
             const Padding(padding: EdgeInsets.only(bottom: 8, left: 4), child: Text('সম্পর্ক', style: TextStyle(fontWeight: FontWeight.w500))),
             Wrap(spacing: 8, runSpacing: 8, children: [
@@ -104,6 +133,8 @@ class _MemberFormState extends State<MemberForm> {
             for (final g in bloodGroups) Chip2(g, selected: _blood == g, onTap: () => setState(() => _blood = _blood == g ? '' : g)),
           ]),
           const SizedBox(height: 16),
+          if (_isSelf && Config.hasBackend)
+            const Padding(padding: EdgeInsets.only(bottom: 12), child: Muted('নাম, মোবাইল, জন্ম সাল ও রক্তের গ্রুপ আপনার অ্যাকাউন্টে থাকবে (রিইনস্টলে আবার লিখতে হবে না)। ওষুধ, ভিজিট, টেস্ট ও প্রেসক্রিপশন শুধু আপনার ফোনে ও আপনার Drive-এ থাকে।', size: 13)),
           Field('অ্যালার্জি (ঐচ্ছিক) — যেমন: পেনিসিলিন', controller: _allergy, icon: Icons.warning_amber),
         ],
       ),
