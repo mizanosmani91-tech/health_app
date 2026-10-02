@@ -49,6 +49,13 @@ jobs:
           echo "Aliases in keystore:"; grep -E "^Alias name:" /tmp/ks.txt
           grep -q "^Alias name: $KEYALIAS\$" /tmp/ks.txt || { echo "::error::ANDROID_KEY_ALIAS does not match any alias above"; exit 1; }
           echo "Keystore type: $(grep -E '^Keystore type:' /tmp/ks.txt)"
+          # Verify the KEY password too (JKS keystores may use a different one). -keypasswd only succeeds with the right old password.
+          cp android/release.jks /tmp/keycheck.jks
+          if ! keytool -keypasswd -keystore /tmp/keycheck.jks -storepass "$KSP" -alias "$KEYALIAS" -keypass "$KEYP" -new "$KEYP" >/dev/null 2>/tmp/kp.err; then
+            echo "::error::ANDROID_KEY_PASSWORD is wrong for this key (the keystore itself opened fine). For JKS keystores the key password can differ from the store password."
+            exit 1
+          fi
+          echo "key password: OK"
           echo "SHA-1 (must equal the one registered in Google's Android OAuth client):"
           grep -E "SHA1:" /tmp/ks.txt | head -1
           # Same cleaned values go to Gradle.
