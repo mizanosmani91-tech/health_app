@@ -339,3 +339,10 @@ test('account profile: saved on the server, validated, survives re-login', async
   assert.equal((await call('GET', '/me', { token: tok })).json.name, 'রহিম');
   srv.close();
 });
+
+test('admin page is served, and the API behind it still needs the key', async () => {
+  const page = await fetch(`${base}/admin`);
+  assert.equal(page.status, 200);
+  assert.match(await page.text(), /ফার্মেসি যাচাই/);
+  assert.equal((await call('GET', '/admin/pharmacies')).status, 401);
+});

@@ -4,12 +4,22 @@ import { PharmacyStatus } from '@prisma/client';
 import { Db } from '../prisma';
 import { HttpError, optText, parse, safeEqual, simpleLimit, text } from '../http';
 import { lookupCatalog } from '../catalog';
+import { ADMIN_CSS, ADMIN_HTML, ADMIN_JS } from '../adminUi';
 
 /** Manual pharmacy verification. Only mounted when ADMIN_KEY is configured. */
 export function adminRoutes(app: Express, d: { db: Db; adminKey: string }) {
   const guard = (req: Request, _res: Response, next: NextFunction) =>
     next(safeEqual(req.get('x-admin-key') ?? '', d.adminKey) ? undefined : new HttpError(401, 'admin key required'));
   const lim = simpleLimit(30);
+
+  // The page itself carries no secrets; it asks for the key in the browser. Its own CSP allows blob: images (licence photos).
+  const page = (type: string, body: string) => (_req: Request, res: Response) => {
+    res.set('Content-Security-Policy', "default-src 'self'; img-src 'self' blob:; style-src 'self'; script-src 'self'; frame-ancestors 'none'");
+    res.type(type).send(body);
+  };
+  app.get('/admin', page('html', ADMIN_HTML));
+  app.get('/admin/ui.js', page('js', ADMIN_JS));
+  app.get('/admin/ui.css', page('css', ADMIN_CSS));
 
   app.get('/admin/pharmacies', lim, guard, async (req, res) => {
     const { status } = parse(z.object({ status: z.nativeEnum(PharmacyStatus).optional() }), req.query);
