@@ -119,7 +119,7 @@ test('full pharmacy flow: register, verify, stock, search privacy, request, repl
   search = await call('POST', '/search', { token: patient, body: { names: ['নাপা', 'ওমিপ্রাজল', 'অজানা'] } });
   const st = Object.fromEntries(search.json.filter((r: any) => r.pharmacyId === pid).map((r: any) => [r.medicineName, r.status]));
   assert.deepEqual(st, { 'নাপা': 'in', 'ওমিপ্রাজল': 'out', 'অজানা': 'unknown' });
-  assert.ok(!/buyPrice|sellPrice|qty|"45"|:45|:38/.test(JSON.stringify(search.json)), 'no price/qty leaks to patients');
+  assert.ok(!/buyPrice|sellPrice|qty|"45"|:45|:38/.test(JSON.stringify(search.json, (k, v) => (k === 'updatedAt' ? undefined : v))), 'no price/qty leaks to patients'); // timestamps like 19:45 are not prices
 
   const rq = await call('POST', '/requests', { token: patient, body: { pharmacyId: pid, patientName: 'করিম', items: [{ name: 'নাপা', days: 10 }, { name: 'ওমিপ্রাজল', days: 7 }] } });
   assert.equal(rq.status, 201);
@@ -345,4 +345,41 @@ test('admin page is served, and the API behind it still needs the key', async ()
   assert.equal(page.status, 200);
   assert.match(await page.text(), /ফার্মেসি যাচাই/);
   assert.equal((await call('GET', '/admin/pharmacies')).status, 401);
+});
+
+test('nearby pharmacies: registered shops first, map places merged, far ones dropped; drug name search', async () => {
+  const fakePlaces = async () => [
+    { name: 'Map Pharmacy', lat: 23.7600, lng: 90.3950, phone: '01700000000', address: 'Road 1' },
+    { name: 'Same Place As Registered', lat: 23.7500, lng: 90.3900, phone: null, address: null }, // within 60 m of the registered shop below
+    { name: 'Far Away', lat: 24.9, lng: 91.8, phone: null, address: null },
+  ];
+  const app = createApp({ db: prisma, verifyGoogle, jwtSecret: 'x'.repeat(40), adminKey: ADMIN, places: fakePlaces });
+  const srv = await new Promise<Server>((r) => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
+  const url = `http://127.0.0.1:${(srv.address() as AddressInfo).port}`;
+  const api = async (method: string, path: string, o: { token?: string; body?: unknown; admin?: boolean } = {}) => {
+    const r = await fetch(url + path, { method, headers: { 'content-type': 'application/json', ...(o.token ? { authorization: `Bearer ${o.token}` } : {}), ...(o.admin ? { 'x-admin-key': ADMIN } : {}) }, body: o.body ? JSON.stringify(o.body) : undefined });
+    return { status: r.status, json: await r.json().catch(() => null) as any };
+  };
+  try {
+    const tok = async (sub: string) => (await api('POST', '/auth/google', { body: { idToken: `good:${sub}:${sub}` } })).json.token as string;
+    const owner = await tok('near-owner'), me = await tok('near-me');
+    const reg = await api('POST', '/pharmacy', { token: owner, body: { ...shop('Nearby Reg'), lat: 23.7500, lng: 90.3900 } });
+    assert.equal(reg.status, 201);
+    assert.equal((await api('POST', `/admin/pharmacies/${reg.json.id}/status`, { admin: true, body: { status: 'verified' } })).status, 200);
+
+    assert.equal((await api('GET', '/pharmacies/nearby?lat=23.751&lng=90.391&km=5')).status, 401);
+    const r = await api('GET', '/pharmacies/nearby?lat=23.751&lng=90.391&km=5', { token: me });
+    assert.equal(r.status, 200);
+    assert.deepEqual(r.json.registered.map((x: any) => x.name), ['Nearby Reg']);
+    assert.ok(r.json.registered[0].distanceKm < 1);
+    assert.deepEqual(r.json.map.map((x: any) => x.name), ['Map Pharmacy']); // duplicate of the registered shop and the far one are gone
+    assert.equal((await api('GET', '/pharmacies/nearby?lat=999&lng=90', { token: me })).status, 400);
+
+    await prisma.drug.deleteMany({ where: { name: { in: ['Zzzdrug 500', 'Zzzgeneric'] } } });
+    await prisma.drug.createMany({ data: [{ name: 'Zzzdrug 500', generic: 'Zzzgeneric', form: 'tablet', kind: 'brand' }, { name: 'Zzzgeneric', generic: 'Zzzgeneric', form: 'tablet', kind: 'generic' }] });
+    const d = await api('GET', '/drugs/search?q=zzzgen', { token: me });
+    assert.equal(d.status, 200);
+    assert.deepEqual(d.json.map((x: any) => x.name).sort(), ['Zzzdrug 500', 'Zzzgeneric']);
+    assert.equal((await api('GET', '/drugs/search?q=z', { token: me })).status, 400);
+  } finally { srv.close(); }
 });

@@ -1,0 +1,268 @@
+name,generic,strength,form,manufacturer,kind
+Paracetamol,Paracetamol,,tablet,,generic
+Paracetamol,Paracetamol,,syrup,,generic
+Paracetamol,Paracetamol,,suppository,,generic
+Paracetamol,Paracetamol,,injection,,generic
+Ibuprofen,Ibuprofen,,tablet,,generic
+Ibuprofen,Ibuprofen,,suspension,,generic
+Diclofenac sodium,Diclofenac sodium,,tablet,,generic
+Diclofenac sodium,Diclofenac sodium,,gel,,generic
+Diclofenac sodium,Diclofenac sodium,,injection,,generic
+Naproxen,Naproxen,,tablet,,generic
+Ketorolac,Ketorolac,,tablet,,generic
+Ketorolac,Ketorolac,,injection,,generic
+Aceclofenac,Aceclofenac,,tablet,,generic
+Etoricoxib,Etoricoxib,,tablet,,generic
+Celecoxib,Celecoxib,,capsule,,generic
+Tramadol,Tramadol,,capsule,,generic
+Tramadol,Tramadol,,injection,,generic
+Aspirin,Aspirin,,tablet,,generic
+Clopidogrel,Clopidogrel,,tablet,,generic
+Atorvastatin,Atorvastatin,,tablet,,generic
+Rosuvastatin,Rosuvastatin,,tablet,,generic
+Simvastatin,Simvastatin,,tablet,,generic
+Amlodipine,Amlodipine,,tablet,,generic
+Losartan potassium,Losartan potassium,,tablet,,generic
+Telmisartan,Telmisartan,,tablet,,generic
+Valsartan,Valsartan,,tablet,,generic
+Enalapril,Enalapril,,tablet,,generic
+Ramipril,Ramipril,,tablet,,generic
+Atenolol,Atenolol,,tablet,,generic
+Bisoprolol,Bisoprolol,,tablet,,generic
+Metoprolol,Metoprolol,,tablet,,generic
+Propranolol,Propranolol,,tablet,,generic
+Carvedilol,Carvedilol,,tablet,,generic
+Hydrochlorothiazide,Hydrochlorothiazide,,tablet,,generic
+Furosemide,Furosemide,,tablet,,generic
+Furosemide,Furosemide,,injection,,generic
+Spironolactone,Spironolactone,,tablet,,generic
+Nifedipine,Nifedipine,,tablet,,generic
+Isosorbide mononitrate,Isosorbide mononitrate,,tablet,,generic
+Digoxin,Digoxin,,tablet,,generic
+Warfarin,Warfarin,,tablet,,generic
+Metformin hydrochloride,Metformin hydrochloride,,tablet,,generic
+Gliclazide,Gliclazide,,tablet,,generic
+Glimepiride,Glimepiride,,tablet,,generic
+Glibenclamide,Glibenclamide,,tablet,,generic
+Sitagliptin,Sitagliptin,,tablet,,generic
+Vildagliptin,Vildagliptin,,tablet,,generic
+Linagliptin,Linagliptin,,tablet,,generic
+Pioglitazone,Pioglitazone,,tablet,,generic
+Insulin human,Insulin human,,injection,,generic
+Levothyroxine sodium,Levothyroxine sodium,,tablet,,generic
+Carbimazole,Carbimazole,,tablet,,generic
+Omeprazole,Omeprazole,,capsule,,generic
+Esomeprazole,Esomeprazole,,tablet,,generic
+Esomeprazole,Esomeprazole,,capsule,,generic
+Pantoprazole,Pantoprazole,,tablet,,generic
+Rabeprazole,Rabeprazole,,tablet,,generic
+Lansoprazole,Lansoprazole,,capsule,,generic
+Ranitidine,Ranitidine,,tablet,,generic
+Famotidine,Famotidine,,tablet,,generic
+Domperidone,Domperidone,,tablet,,generic
+Domperidone,Domperidone,,suspension,,generic
+Metoclopramide,Metoclopramide,,tablet,,generic
+Ondansetron,Ondansetron,,tablet,,generic
+Ondansetron,Ondansetron,,injection,,generic
+Antacid (aluminium hydroxide + magnesium hydroxide),Antacid (aluminium hydroxide + magnesium hydroxide),,suspension,,generic
+Antacid (aluminium hydroxide + magnesium hydroxide),Antacid (aluminium hydroxide + magnesium hydroxide),,tablet,,generic
+Sucralfate,Sucralfate,,suspension,,generic
+Loperamide,Loperamide,,capsule,,generic
+Oral rehydration salts (ORS),Oral rehydration salts (ORS),,powder,,generic
+Zinc sulphate,Zinc sulphate,,tablet,,generic
+Zinc sulphate,Zinc sulphate,,syrup,,generic
+Lactulose,Lactulose,,syrup,,generic
+Bisacodyl,Bisacodyl,,tablet,,generic
+Mebeverine,Mebeverine,,tablet,,generic
+Hyoscine butylbromide,Hyoscine butylbromide,,tablet,,generic
+Hyoscine butylbromide,Hyoscine butylbromide,,injection,,generic
+Amoxicillin,Amoxicillin,,capsule,,generic
+Amoxicillin,Amoxicillin,,suspension,,generic
+Amoxicillin + clavulanic acid,Amoxicillin + clavulanic acid,,tablet,,generic
+Amoxicillin + clavulanic acid,Amoxicillin + clavulanic acid,,suspension,,generic
+Ampicillin,Ampicillin,,capsule,,generic
+Azithromycin,Azithromycin,,tablet,,generic
+Azithromycin,Azithromycin,,suspension,,generic
+Clarithromycin,Clarithromycin,,tablet,,generic
+Erythromycin,Erythromycin,,tablet,,generic
+Cefixime,Cefixime,,capsule,,generic
+Cefixime,Cefixime,,suspension,,generic
+Cefuroxime,Cefuroxime,,tablet,,generic
+Cefuroxime,Cefuroxime,,suspension,,generic
+Cefpodoxime,Cefpodoxime,,tablet,,generic
+Ceftriaxone,Ceftriaxone,,injection,,generic
+Cefradine,Cefradine,,capsule,,generic
+Cephalexin,Cephalexin,,capsule,,generic
+Ciprofloxacin,Ciprofloxacin,,tablet,,generic
+Levofloxacin,Levofloxacin,,tablet,,generic
+Moxifloxacin,Moxifloxacin,,tablet,,generic
+Ofloxacin,Ofloxacin,,tablet,,generic
+Doxycycline,Doxycycline,,capsule,,generic
+Tetracycline,Tetracycline,,capsule,,generic
+Metronidazole,Metronidazole,,tablet,,generic
+Metronidazole,Metronidazole,,suspension,,generic
+Tinidazole,Tinidazole,,tablet,,generic
+Secnidazole,Secnidazole,,tablet,,generic
+Nitrofurantoin,Nitrofurantoin,,tablet,,generic
+Co-trimoxazole,Co-trimoxazole,,tablet,,generic
+Co-trimoxazole,Co-trimoxazole,,suspension,,generic
+Gentamicin,Gentamicin,,injection,,generic
+Amikacin,Amikacin,,injection,,generic
+Cloxacillin,Cloxacillin,,capsule,,generic
+Flucloxacillin,Flucloxacillin,,capsule,,generic
+Fluconazole,Fluconazole,,capsule,,generic
+Itraconazole,Itraconazole,,capsule,,generic
+Terbinafine,Terbinafine,,tablet,,generic
+Terbinafine,Terbinafine,,cream,,generic
+Clotrimazole,Clotrimazole,,cream,,generic
+Ketoconazole,Ketoconazole,,cream,,generic
+Ketoconazole,Ketoconazole,,shampoo,,generic
+Acyclovir,Acyclovir,,tablet,,generic
+Acyclovir,Acyclovir,,cream,,generic
+Oseltamivir,Oseltamivir,,capsule,,generic
+Albendazole,Albendazole,,tablet,,generic
+Albendazole,Albendazole,,suspension,,generic
+Mebendazole,Mebendazole,,tablet,,generic
+Mebendazole,Mebendazole,,suspension,,generic
+Ivermectin,Ivermectin,,tablet,,generic
+Praziquantel,Praziquantel,,tablet,,generic
+Chloroquine,Chloroquine,,tablet,,generic
+Artemether + lumefantrine,Artemether + lumefantrine,,tablet,,generic
+Primaquine,Primaquine,,tablet,,generic
+Isoniazid,Isoniazid,,tablet,,generic
+Rifampicin,Rifampicin,,capsule,,generic
+Pyrazinamide,Pyrazinamide,,tablet,,generic
+Ethambutol,Ethambutol,,tablet,,generic
+Cetirizine,Cetirizine,,tablet,,generic
+Cetirizine,Cetirizine,,syrup,,generic
+Levocetirizine,Levocetirizine,,tablet,,generic
+Fexofenadine,Fexofenadine,,tablet,,generic
+Loratadine,Loratadine,,tablet,,generic
+Chlorpheniramine,Chlorpheniramine,,tablet,,generic
+Chlorpheniramine,Chlorpheniramine,,syrup,,generic
+Montelukast,Montelukast,,tablet,,generic
+Salbutamol,Salbutamol,,tablet,,generic
+Salbutamol,Salbutamol,,inhaler,,generic
+Salbutamol,Salbutamol,,syrup,,generic
+Ipratropium,Ipratropium,,inhaler,,generic
+Budesonide,Budesonide,,inhaler,,generic
+Beclometasone,Beclometasone,,inhaler,,generic
+Theophylline,Theophylline,,tablet,,generic
+Bromhexine,Bromhexine,,syrup,,generic
+Bromhexine,Bromhexine,,tablet,,generic
+Ambroxol,Ambroxol,,syrup,,generic
+Ambroxol,Ambroxol,,tablet,,generic
+Dextromethorphan,Dextromethorphan,,syrup,,generic
+Acetylcysteine,Acetylcysteine,,sachet,,generic
+Acetylcysteine,Acetylcysteine,,tablet,,generic
+Prednisolone,Prednisolone,,tablet,,generic
+Methylprednisolone,Methylprednisolone,,tablet,,generic
+Dexamethasone,Dexamethasone,,tablet,,generic
+Dexamethasone,Dexamethasone,,injection,,generic
+Hydrocortisone,Hydrocortisone,,cream,,generic
+Hydrocortisone,Hydrocortisone,,injection,,generic
+Betamethasone,Betamethasone,,cream,,generic
+Betamethasone,Betamethasone,,ointment,,generic
+Mometasone,Mometasone,,cream,,generic
+Clobetasol,Clobetasol,,cream,,generic
+Fusidic acid,Fusidic acid,,cream,,generic
+Mupirocin,Mupirocin,,ointment,,generic
+Silver sulfadiazine,Silver sulfadiazine,,cream,,generic
+Permethrin,Permethrin,,lotion,,generic
+Calamine,Calamine,,lotion,,generic
+Folic acid,Folic acid,,tablet,,generic
+Ferrous fumarate,Ferrous fumarate,,capsule,,generic
+Ferrous sulfate,Ferrous sulfate,,tablet,,generic
+Iron sucrose,Iron sucrose,,injection,,generic
+Cyanocobalamin (vitamin B12),Cyanocobalamin (vitamin B12),,tablet,,generic
+Cyanocobalamin (vitamin B12),Cyanocobalamin (vitamin B12),,injection,,generic
+Vitamin B complex,Vitamin B complex,,tablet,,generic
+Vitamin C (ascorbic acid),Vitamin C (ascorbic acid),,tablet,,generic
+Vitamin D3 (cholecalciferol),Vitamin D3 (cholecalciferol),,capsule,,generic
+Vitamin D3 (cholecalciferol),Vitamin D3 (cholecalciferol),,tablet,,generic
+Calcium carbonate,Calcium carbonate,,tablet,,generic
+Calcium + vitamin D3,Calcium + vitamin D3,,tablet,,generic
+Multivitamin and minerals,Multivitamin and minerals,,tablet,,generic
+Vitamin A,Vitamin A,,capsule,,generic
+Omega-3 fatty acids,Omega-3 fatty acids,,capsule,,generic
+Pregabalin,Pregabalin,,capsule,,generic
+Gabapentin,Gabapentin,,capsule,,generic
+Amitriptyline,Amitriptyline,,tablet,,generic
+Nortriptyline,Nortriptyline,,tablet,,generic
+Escitalopram,Escitalopram,,tablet,,generic
+Sertraline,Sertraline,,tablet,,generic
+Fluoxetine,Fluoxetine,,capsule,,generic
+Paroxetine,Paroxetine,,tablet,,generic
+Alprazolam,Alprazolam,,tablet,,generic
+Clonazepam,Clonazepam,,tablet,,generic
+Diazepam,Diazepam,,tablet,,generic
+Zolpidem,Zolpidem,,tablet,,generic
+Haloperidol,Haloperidol,,tablet,,generic
+Risperidone,Risperidone,,tablet,,generic
+Olanzapine,Olanzapine,,tablet,,generic
+Quetiapine,Quetiapine,,tablet,,generic
+Lithium carbonate,Lithium carbonate,,tablet,,generic
+Carbamazepine,Carbamazepine,,tablet,,generic
+Sodium valproate,Sodium valproate,,tablet,,generic
+Phenytoin,Phenytoin,,tablet,,generic
+Levetiracetam,Levetiracetam,,tablet,,generic
+Phenobarbital,Phenobarbital,,tablet,,generic
+Levodopa + carbidopa,Levodopa + carbidopa,,tablet,,generic
+Donepezil,Donepezil,,tablet,,generic
+Sumatriptan,Sumatriptan,,tablet,,generic
+Flunarizine,Flunarizine,,tablet,,generic
+Betahistine,Betahistine,,tablet,,generic
+Cinnarizine,Cinnarizine,,tablet,,generic
+Tamsulosin,Tamsulosin,,capsule,,generic
+Finasteride,Finasteride,,tablet,,generic
+Sildenafil,Sildenafil,,tablet,,generic
+Alendronate,Alendronate,,tablet,,generic
+Allopurinol,Allopurinol,,tablet,,generic
+Colchicine,Colchicine,,tablet,,generic
+Febuxostat,Febuxostat,,tablet,,generic
+Methotrexate,Methotrexate,,tablet,,generic
+Hydroxychloroquine,Hydroxychloroquine,,tablet,,generic
+Tranexamic acid,Tranexamic acid,,tablet,,generic
+Tranexamic acid,Tranexamic acid,,injection,,generic
+Mefenamic acid,Mefenamic acid,,tablet,,generic
+Norethisterone,Norethisterone,,tablet,,generic
+Combined oral contraceptive pill,Combined oral contraceptive pill,,tablet,,generic
+Misoprostol,Misoprostol,,tablet,,generic
+Oxytocin,Oxytocin,,injection,,generic
+Metronidazole + miconazole,Metronidazole + miconazole,,pessary,,generic
+Clindamycin,Clindamycin,,capsule,,generic
+Clindamycin,Clindamycin,,gel,,generic
+Chlorhexidine,Chlorhexidine,,mouthwash,,generic
+Povidone iodine,Povidone iodine,,solution,,generic
+Tropicamide,Tropicamide,,eye drops,,generic
+Ciprofloxacin,Ciprofloxacin,,eye drops,,generic
+Timolol,Timolol,,eye drops,,generic
+Carboxymethylcellulose,Carboxymethylcellulose,,eye drops,,generic
+Xylometazoline,Xylometazoline,,nasal drops,,generic
+Saline nasal drops,Saline nasal drops,,nasal drops,,generic
+Sodium chloride 0.9% (normal saline),Sodium chloride 0.9% (normal saline),,infusion,,generic
+Dextrose 5%,Dextrose 5%,,infusion,,generic
+Ringer's lactate,Ringer's lactate,,infusion,,generic
+Adrenaline (epinephrine),Adrenaline (epinephrine),,injection,,generic
+Atropine,Atropine,,injection,,generic
+Lidocaine,Lidocaine,,injection,,generic
+Lidocaine,Lidocaine,,gel,,generic
+Diazepam,Diazepam,,injection,,generic
+Heparin,Heparin,,injection,,generic
+Enoxaparin,Enoxaparin,,injection,,generic
+Vitamin K (phytomenadione),Vitamin K (phytomenadione),,injection,,generic
+Tetanus toxoid,Tetanus toxoid,,injection,,generic
+Rabies vaccine,Rabies vaccine,,injection,,generic
+Glyceryl trinitrate,Glyceryl trinitrate,,tablet,,generic
+Glyceryl trinitrate,Glyceryl trinitrate,,spray,,generic
+Sodium bicarbonate,Sodium bicarbonate,,tablet,,generic
+Potassium chloride,Potassium chloride,,syrup,,generic
+Potassium chloride,Potassium chloride,,tablet,,generic
+Magnesium oxide,Magnesium oxide,,tablet,,generic
+Simethicone,Simethicone,,drops,,generic
+Simethicone,Simethicone,,tablet,,generic
+Pancreatin,Pancreatin,,tablet,,generic
+Ursodeoxycholic acid,Ursodeoxycholic acid,,tablet,,generic
+Silymarin,Silymarin,,tablet,,generic
+Probiotic (Lactobacillus),Probiotic (Lactobacillus),,sachet,,generic
+Probiotic (Lactobacillus),Probiotic (Lactobacillus),,capsule,,generic

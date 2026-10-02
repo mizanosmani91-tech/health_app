@@ -30,6 +30,7 @@ npm run build
 [[ -f dist/server.js ]] || { echo "!! build failed"; exit 1; }
 set -a; source "$ENVF"; set +a
 npx prisma migrate deploy
+[[ -f data/generics.csv ]] && { npx tsx scripts/import-drugs.ts data/generics.csv || echo "!! drug list import failed (non-fatal)"; }
 chown -R root:root "$APP"
 chmod -R go+rX "$APP"   # readable by the unprivileged service user
 

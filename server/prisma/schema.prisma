@@ -72,6 +72,8 @@ model Pharmacy {
   openFrom   String         @default("09:00")
   openTo     String         @default("22:00")
   weeklyOff  String?
+  lat        Float?
+  lng        Float?
   notifyNew  Boolean        @default(true)
   createdAt  DateTime       @default(now())
   license    LicensePhoto?
@@ -203,4 +205,19 @@ model ScanUsage {
   count  Int    @default(0)
 
   @@id([userId, day])
+}
+
+/// Searchable medicine names (generic list + imports of public registers). Identity only: no prices.
+model Drug {
+  id           String @id @default(uuid())
+  name         String
+  generic      String @default("")
+  strength     String @default("")
+  form         String @default("")
+  manufacturer String @default("")
+  kind         String @default("brand") // brand | generic
+
+  @@unique([name, form, strength, manufacturer])
+  @@index([name])
+  @@index([generic])
 }

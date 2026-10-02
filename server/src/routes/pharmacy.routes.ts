@@ -9,7 +9,7 @@ import { HttpError, day, hhmm, n, optMoney, optText, parse, simpleLimit, text } 
 const pharmacyJson = (p: Pharmacy) => ({
   id: p.id, ownerId: p.ownerId, name: p.name, address: p.address, phone: p.phone, licenseNo: p.licenseNo,
   // isOpen = open right now (switch AND hours AND not the weekly off day); manualOpen = the owner's switch
-  status: p.status, isOpen: openStatus(p).open, closedReason: openStatus(p).reason, manualOpen: p.isOpen, openFrom: p.openFrom, openTo: p.openTo, weeklyOff: p.weeklyOff,
+  status: p.status, isOpen: openStatus(p).open, closedReason: openStatus(p).reason, manualOpen: p.isOpen, openFrom: p.openFrom, openTo: p.openTo, weeklyOff: p.weeklyOff, lat: p.lat, lng: p.lng,
   notifyNew: p.notifyNew, createdAt: p.createdAt,
 });
 
@@ -46,7 +46,7 @@ export function pharmacyRoutes(app: Express, d: { db: Db; authed: any }) {
 
   app.post('/pharmacy', ...owner, async (req, res) => {
     const b = parse(
-      z.object({ name: text(120), address: text(300), phone: text(30), licenseNo: text(60), licenseImage: z.string().min(1).max(1_000_000) }),
+      z.object({ name: text(120), address: text(300), phone: text(30), licenseNo: text(60), licenseImage: z.string().min(1).max(1_000_000), lat: z.number().min(-90).max(90).optional(), lng: z.number().min(-180).max(180).optional() }),
       req.body,
     );
     const bytes = Buffer.from(b.licenseImage, 'base64');
@@ -54,7 +54,7 @@ export function pharmacyRoutes(app: Express, d: { db: Db; authed: any }) {
     if (await db.pharmacy.findUnique({ where: { ownerId: req.user!.id } })) throw new HttpError(409, 'pharmacy already registered');
     const p = await db.pharmacy.create({
       data: {
-        ownerId: req.user!.id, name: b.name, address: b.address, phone: b.phone, licenseNo: b.licenseNo,
+        ownerId: req.user!.id, name: b.name, address: b.address, phone: b.phone, licenseNo: b.licenseNo, lat: b.lat, lng: b.lng,
         license: { create: { image: bytes } },
       },
     });
@@ -70,6 +70,7 @@ export function pharmacyRoutes(app: Express, d: { db: Db; authed: any }) {
       z.object({
         name: text(120), address: text(300), phone: text(30), licenseNo: text(60), isOpen: z.boolean(),
         notifyNew: z.boolean(), openFrom: hhmm, openTo: hhmm, weeklyOff: optText(100),
+        lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180),
       }).partial(),
       req.body,
     );
