@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/bn.dart';
-import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../data/local_db.dart';
 import '../../data/models.dart';
@@ -63,7 +62,7 @@ class _PrescriptionScanPageState extends State<PrescriptionScanPage> {
     final date = d.visitDate ?? dateOnly(DateTime.now());
     final vid = await db.saveVisit(Visit(
       memberId: widget.member.id!, date: date, doctor: d.doctor.trim(), problem: d.problem.trim(),
-      nextVisit: d.nextVisit, prescriptions: [if (_image != null) _image!]));
+      nextVisit: d.nextVisit, prescriptions: [?_image]));
     for (final m in d.medicines) {
       await db.saveMedicine(m.toMedicine(widget.member.id!, vid, dateOnly(DateTime.now())));
     }
@@ -124,7 +123,7 @@ class _PrescriptionScanPageState extends State<PrescriptionScanPage> {
       const Padding(padding: EdgeInsets.only(top: 6), child: Muted('ছবিতে চাপ দিয়ে বড় করে দেখুন, আর নিচের তথ্য কাগজের সাথে মেলান।')),
       Padding(
         padding: const EdgeInsets.symmetric(vertical: 10),
-        child: unsure == 0 ? const Pill.ok('সব ওষুধ নিশ্চিত') : Pill.low('${unsure}টি ওষুধ মিলিয়ে নিশ্চিত করা বাকি'),
+        child: unsure == 0 ? const Pill.ok('সব ওষুধ নিশ্চিত') : Pill.low('$unsureটি ওষুধ মিলিয়ে নিশ্চিত করা বাকি'),
       ),
       Field('ডাক্তার', controller: _doctor, icon: Icons.person, onChanged: (v) => d.doctor = v),
       Field('সমস্যা', controller: _problem, icon: Icons.healing, onChanged: (v) => d.problem = v),

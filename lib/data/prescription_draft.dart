@@ -1,3 +1,4 @@
+import '../core/bn.dart';
 import 'models.dart';
 
 /// A prescription as read by the server's AI. It is only a DRAFT: nothing is saved
