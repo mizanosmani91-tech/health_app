@@ -62,7 +62,7 @@ class _OwnerRegisterScreenState extends State<OwnerRegisterScreen> {
                 final p = await LocationService.current();
                 setState(() { _lat = p.lat; _lng = p.lng; });
               } catch (e) {
-                if (mounted) context.toast('$e');
+                if (context.mounted) context.toast('$e');
               }
             }),
             const SizedBox(height: 12),
